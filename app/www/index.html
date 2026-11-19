@@ -12,13 +12,44 @@
 </head>
 <body>
 
-<!-- ĐĂNG NHẬP -->
-<div id="auth" class="screen center">
+<!-- TRANG CHỦ (không cần đăng nhập) -->
+<div id="home" class="screen">
+  <aside class="side">
+    <div class="brand"><img src="img/icon-256.png" alt="" class="brand-ic"><img src="img/logo.png" alt="VIECUT" class="brand-logo"></div>
+    <div class="acct" id="acct"></div>
+    <nav class="nav">
+      <button class="nav-i on" data-store="local"><span>🏠</span> Trang chủ</button>
+      <button class="nav-i" data-store="cloud"><span>☁️</span> Dự án đám mây</button>
+    </nav>
+    <div class="grow"></div>
+    <button type="button" class="nav-i theme-row"><span class="theme-ic">🌙</span> <span class="theme-txt">Giao diện tối</span></button>
+    <div class="side-foot">VIECUT · Phạm Thành Long (thlong)</div>
+  </aside>
+  <main class="home-main">
+    <button class="hero" id="heroNew"><span class="hero-plus">+</span><span>Tạo dự án</span></button>
+    <div class="quick">
+      <button class="qcard" data-new="9:16"><span class="qi">📱</span><b>Video TikTok / Reels</b><small>Khung dọc 9:16</small></button>
+      <button class="qcard" data-new="16:9"><span class="qi">🖥️</span><b>Video YouTube</b><small>Khung ngang 16:9</small></button>
+      <button class="qcard" data-new="1:1"><span class="qi">⬛</span><b>Bài đăng vuông</b><small>Khung 1:1</small></button>
+      <button class="qcard" data-new="4:5"><span class="qi">🖼️</span><b>Facebook / Instagram</b><small>Khung 4:5</small></button>
+      <label class="qcard"><span class="qi">📂</span><b>Mở video có sẵn</b><small>Tạo dự án từ file</small><input type="file" id="quickFile" multiple accept="video/*,audio/*,image/*" hidden></label>
+    </div>
+    <div class="proj-head">
+      <h2 id="projTitle">Dự án trên máy này</h2>
+      <div class="grow"></div>
+      <input id="projSearch" placeholder="🔍 Tìm dự án">
+    </div>
+    <div id="projList" class="proj-grid"></div>
+  </main>
+</div>
+
+<!-- ĐĂNG NHẬP (không bắt buộc) -->
+<div id="authModal" class="modal hidden">
   <form class="card auth-card" id="authForm">
-    <button type="button" class="btn icon theme-btn" title="Đổi giao diện sáng / tối">🌙</button>
+    <button type="button" class="btn icon close-x" id="authClose" title="Đóng">✕</button>
     <img src="img/icon-256.png" alt="" class="auth-icon">
     <img src="img/logo.png" alt="VIECUT" class="logo-img big">
-    <p class="muted">Đăng nhập để edit trên mọi máy</p>
+    <p class="muted">Đăng nhập để lưu dự án lên đám mây và mở lại trên mọi máy. Không đăng nhập vẫn edit bình thường.</p>
     <input id="asrv" placeholder="Địa chỉ server, vd http://192.168.1.10:3000" required>
     <input id="au" placeholder="Tên đăng nhập" autocomplete="username" required>
     <input id="ap" type="password" placeholder="Mật khẩu" autocomplete="current-password" required>
@@ -31,34 +62,11 @@
   </form>
 </div>
 
-<!-- DANH SÁCH DỰ ÁN -->
-<div id="projects" class="screen hidden">
-  <header class="topbar">
-    <img src="img/logo.png" alt="VIECUT" class="logo-img">
-    <div class="grow"></div>
-    <span class="muted" id="meName"></span>
-    <button type="button" class="btn icon theme-btn" title="Đổi giao diện sáng / tối">🌙</button>
-    <button class="btn" id="logoutBtn">Đăng xuất</button>
-  </header>
-  <div class="proj-wrap">
-    <div class="row gap wrap">
-      <h2 class="grow">Dự án của bạn</h2>
-      <select id="newAspect" class="sel">
-        <option value="9:16">9:16 (TikTok/Reels)</option>
-        <option value="16:9">16:9 (YouTube)</option>
-        <option value="1:1">1:1</option>
-        <option value="4:5">4:5</option>
-      </select>
-      <button class="btn primary" id="newProj">+ Dự án mới</button>
-    </div>
-    <div id="projList" class="proj-grid"></div>
-  </div>
-</div>
-
 <!-- EDITOR -->
 <div id="editor" class="screen hidden">
   <header class="topbar">
-    <button class="btn icon" id="backBtn" title="Về danh sách">←</button>
+    <button class="btn icon" id="backBtn" title="Về trang chủ">←</button>
+    <span id="storeBadge" class="store-badge"></span>
     <input id="projName" class="name-input">
     <select id="aspectSel" class="sel">
       <option value="9:16">9:16</option><option value="16:9">16:9</option>
@@ -147,10 +155,37 @@
   </div>
 </div>
 
+<!-- XUẤT VIDEO BẰNG LÕI FFMPEG -->
+<div id="nexModal" class="modal hidden">
+  <div class="card nex">
+    <div class="row"><h3 class="grow">Xuất video</h3><button class="btn icon" id="nexClose" title="Đóng">✕</button></div>
+    <div id="nexForm" class="nex-form">
+      <label>Tên file<input id="nexName"></label>
+      <div class="nex-grid">
+        <label>Độ phân giải<select id="nexRes"><option>720p</option><option>1080p</option><option>2K</option><option>4K</option></select></label>
+        <label>Tốc độ khung hình<select id="nexFps"><option value="24">24 fps</option><option value="25">25 fps</option><option value="30">30 fps</option><option value="50">50 fps</option><option value="60">60 fps</option></select></label>
+        <label>Chất lượng<select id="nexQ"><option value="std">Tiêu chuẩn (nhẹ)</option><option value="high">Cao</option><option value="best">Rất cao (chậm hơn)</option></select></label>
+      </div>
+      <p class="muted small" id="nexInfo"></p>
+      <button class="btn primary block" id="nexGo">Chọn nơi lưu và xuất</button>
+    </div>
+    <div id="nexRun" class="hidden">
+      <div class="nex-pct" id="nexPct">0%</div>
+      <div class="bar"><div id="nexBar"></div></div>
+      <p class="muted small" id="nexStep"></p>
+      <div class="row gap end">
+        <button class="btn" id="nexCancel">Hủy</button>
+        <span id="nexDone" class="row gap hidden"><button class="btn" id="nexOpen">Mở thư mục</button><button class="btn primary" id="nexOk">Xong</button></span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast hidden"></div>
 <div id="mediaPool" aria-hidden="true"></div>
 <script src="config.js"></script>
 <script src="native.js"></script>
+<script src="storage.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

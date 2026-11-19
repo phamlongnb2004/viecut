@@ -8,3 +8,4 @@ app/ios/App/Pods/
 cloudflare/site/files/
 cloudflare/site/manifest.json
 .wrangler/
+app/vendor/

@@ -166,3 +166,73 @@ html[data-theme=dark] #auth{background:radial-gradient(800px 500px at 10% 0%,rgb
 html[data-theme=dark] .toast{background:#000}
 .theme-btn{font-size:16px;padding:6px 10px;min-width:38px}
 .auth-card{position:relative}.auth-card .theme-btn{position:absolute;top:12px;right:12px}
+
+/* ===== TRANG CHỦ ===== */
+#home{flex-direction:row}
+.side{width:248px;flex:none;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:14px;padding:16px 14px;overflow:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:2px 4px}
+.brand-ic{width:38px;height:38px;border-radius:10px}.brand-logo{height:26px}
+.acct{display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;background:var(--panel2);border:1px solid var(--line)}
+.ava{width:38px;height:38px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;background:linear-gradient(135deg,#C1272C,#e7563b)}
+.ava.guest{background:linear-gradient(135deg,#5fae4f,#2f7d32);font-size:18px}
+.who{flex:1;min-width:0;display:flex;flex-direction:column}.who b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who small{color:var(--muted);font-size:11px;line-height:1.3}
+.btn.sm{padding:6px 10px;font-size:12px}
+.nav{display:flex;flex-direction:column;gap:4px}
+.nav-i{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:none;border-radius:10px;padding:10px 12px;cursor:pointer;color:var(--text);font-weight:600}
+.nav-i:hover{background:var(--panel2)}.nav-i.on{background:rgba(193,39,44,.1);color:var(--accent)}
+.nav-i span:first-child{width:22px;text-align:center}
+.side-foot{font-size:11px;color:var(--muted);padding:0 6px}
+.home-main{flex:1;min-width:0;overflow:auto;padding:24px 30px 40px}
+.hero{width:100%;height:150px;border:none;border-radius:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:16px;font-size:26px;font-weight:800;color:#fff;
+ background:linear-gradient(120deg,#C1272C 0%,#e2552f 45%,#3f9a3c 100%);box-shadow:0 14px 34px rgba(193,39,44,.25);transition:.2s;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;inset:0;background:radial-gradient(500px 160px at 80% 0%,rgba(255,255,255,.28),transparent 60%)}
+.hero:hover{transform:translateY(-2px);box-shadow:0 18px 40px rgba(193,39,44,.32)}
+.hero-plus{width:46px;height:46px;border-radius:12px;background:#fff;color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:32px;line-height:1}
+.quick{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin:18px 0 6px}
+.qcard{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:16px;border-radius:16px;cursor:pointer;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);transition:.15s;color:var(--text)}
+.qcard:hover{border-color:var(--accent);transform:translateY(-2px)}
+.qi{font-size:24px;margin-bottom:6px}.qcard b{font-size:14px}.qcard small{color:var(--muted);font-size:12px}
+.proj-head{display:flex;align-items:center;gap:12px;margin:26px 0 12px}
+.proj-head h2{margin:0;font-size:18px}
+#projSearch{width:220px}
+#home .proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px;margin:0}
+#home .proj{padding:0;border:none;background:none;box-shadow:none;gap:4px;cursor:pointer}
+#home .proj:hover{transform:none}
+.pthumb{position:relative;aspect-ratio:1;border-radius:14px;overflow:hidden;background:var(--panel2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:34px;transition:.15s;box-shadow:var(--shadow)}
+#home .proj:hover .pthumb{border-color:var(--accent);transform:translateY(-2px)}
+.pthumb img{width:100%;height:100%;object-fit:cover}
+.pthumb .badge,.pthumb .dur{position:absolute;bottom:8px;font-style:normal;font-size:11px;font-weight:700;color:#fff;background:#000a;padding:2px 6px;border-radius:6px}
+.pthumb .badge{left:8px}.pthumb .dur{right:8px}
+.pthumb .del{position:absolute;top:8px;right:8px;border:none;border-radius:8px;padding:4px 7px;background:#fffd;cursor:pointer;opacity:0;transition:.15s;font-size:13px}
+#home .proj:hover .del,.pthumb .del.warn{opacity:1}.pthumb .del.warn{background:var(--accent);color:#fff;font-weight:700}
+.pname{font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:6px}
+.empty{grid-column:1/-1;text-align:center;padding:40px 20px;border:2px dashed var(--line);border-radius:18px;color:var(--muted)}
+.empty b{display:block;color:var(--text);font-size:16px;margin-bottom:6px}.empty p{margin:0 0 14px}
+.empty-ic{font-size:40px;margin-bottom:8px}
+.close-x{position:absolute;top:12px;right:12px}
+#authModal .auth-card{max-height:92vh;overflow:auto}
+.store-badge{font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);padding:4px 8px;border-radius:8px;white-space:nowrap}
+@media (max-width:900px){
+  #home{flex-direction:column}
+  .side{width:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px;gap:8px;border-right:none;border-bottom:1px solid var(--line)}
+  .side .grow,.side-foot,.brand-logo{display:none}
+  .acct{flex:1;min-width:220px;padding:8px}
+  .nav{flex-direction:row}.nav-i{padding:8px 10px}
+  .theme-row .theme-txt{display:none}
+  .home-main{padding:14px}.hero{height:110px;font-size:21px}
+  #projSearch{width:140px}
+}
+.acct{flex-wrap:wrap}
+.acct .who{flex:1 1 120px}
+.acct #loginBtn{flex-basis:100%;padding:9px}
+
+/* hộp thoại xuất video */
+.nex{width:min(460px,94vw)}.nex h3{margin:0}
+.nex-form{display:flex;flex-direction:column;gap:12px}
+.nex-form label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:600}
+.nex-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.nex-pct{font-size:34px;font-weight:800;color:var(--accent);text-align:center}
+#nexBar{height:100%;width:0;background:linear-gradient(90deg,#C1272C,#3f9a3c);transition:width .2s}
+#nexStep{word-break:break-all;min-height:18px}
+@media (max-width:600px){.nex-grid{grid-template-columns:1fr}}

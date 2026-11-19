@@ -38,18 +38,30 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 function applyTheme(t) {
   if (t === 'dark') document.documentElement.dataset.theme = 'dark'; else delete document.documentElement.dataset.theme;
   $$('.theme-btn').forEach(b => b.textContent = t === 'dark' ? '☀' : '🌙');
+  $$('.theme-ic').forEach(b => b.textContent = t === 'dark' ? '☀️' : '🌙');
+  $$('.theme-txt').forEach(b => b.textContent = t === 'dark' ? 'Giao diện sáng' : 'Giao diện tối');
 }
 applyTheme(LS.get('theme', 'light'));
-$$('.theme-btn').forEach(b => b.addEventListener('click', e => {
+$$('.theme-btn,.theme-row').forEach(b => b.addEventListener('click', e => {
   e.preventDefault();
   const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
   LS.set('theme', t); applyTheme(t);
 }));
 
-/* ================= ĐĂNG NHẬP ================= */
+/* ================= NƠI LƯU: TRÊN MÁY / ĐÁM MÂY ================= */
+const Cloud = makeCloudStore({ api, server: () => SERVER, token: () => token });
+let S = LocalStore;            // nơi lưu của dự án đang mở
+let homeStore = 'local';       // tab đang xem ở trang chủ
+const storeOf = k => k === 'cloud' ? Cloud : LocalStore;
+
+/* ================= ĐĂNG NHẬP (không bắt buộc) ================= */
 $('#asrv').value = SERVER;
 if (FIXED_SERVER) { $('#asrv').classList.add('hidden'); $('#asrv').required = false; }
-let authAct = 'login';
+let authAct = 'login', afterLogin = null;
+function openAuth(then) { afterLogin = then || null; $('#amsg').textContent = ''; $('#authModal').classList.remove('hidden'); setTimeout(() => $(FIXED_SERVER || !$('#asrv').value ? (FIXED_SERVER ? '#au' : '#asrv') : '#au').focus(), 50); }
+function closeAuth() { $('#authModal').classList.add('hidden'); }
+$('#authClose').onclick = closeAuth;
+$('#authModal').addEventListener('pointerdown', e => { if (e.target.id === 'authModal') closeAuth(); });
 $$('#authForm button[data-act]').forEach(b => b.addEventListener('click', () => authAct = b.dataset.act));
 $('#authForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -68,38 +80,82 @@ $('#authForm').addEventListener('submit', async e => {
   }
   try {
     const d = await api('/api/' + authAct, { method: 'POST', json: { username: $('#au').value, password: $('#ap').value } });
-    token = d.token; LS.set('tk', token); me = d.user; openProjects();
+    token = d.token; LS.set('tk', token); me = d.user; closeAuth(); renderAcct();
+    toast('Đã đăng nhập: ' + me.username);
+    if (afterLogin) { const f = afterLogin; afterLogin = null; f(); } else renderHome();
   } catch (err) { $('#amsg').textContent = err.message; }
 });
-function logout() { token = ''; LS.del('tk'); me = null; show('auth'); }
-$('#logoutBtn').onclick = logout;
-
-/* ================= DỰ ÁN ================= */
-async function openProjects() {
-  show('projects');
-  $('#meName').textContent = me ? me.username : '';
-  const list = $('#projList'); list.innerHTML = '<p class="muted">Đang tải…</p>';
-  try {
-    const ps = await api('/api/projects');
-    list.innerHTML = ps.length ? '' : '<p class="muted">Chưa có dự án nào. Bấm “+ Dự án mới”.</p>';
-    for (const p of ps) {
-      const d = document.createElement('div'); d.className = 'proj';
-      d.innerHTML = `<div class="pname"></div><div class="row"><span class="muted small">${p.aspect || ''} · ${new Date(p.updated).toLocaleString('vi-VN')}</span><button class="del" title="Xóa">🗑</button></div>`;
-      d.querySelector('.pname').textContent = p.name;
-      d.onclick = () => openEditor(p.id);
-      d.querySelector('.del').onclick = async ev => {
-        ev.stopPropagation();
-        if (d.dataset.confirm) { await api('/api/projects/' + p.id, { method: 'DELETE' }); openProjects(); }
-        else { d.dataset.confirm = 1; ev.target.textContent = 'Xóa?'; setTimeout(() => { delete d.dataset.confirm; ev.target.textContent = '🗑'; }, 2500); }
-      };
-      list.appendChild(d);
-    }
-  } catch (err) { list.innerHTML = ''; toast(err.message); }
+function logout() {
+  token = ''; LS.del('tk'); me = null; renderAcct();
+  if (homeStore === 'cloud') setHomeStore('local');
+  if (!$('#editor').classList.contains('hidden') && S === Cloud) { P = null; openHome(); }
 }
-$('#newProj').onclick = async () => {
-  const p = await api('/api/projects', { method: 'POST', json: { name: 'Dự án ' + new Date().toLocaleDateString('vi-VN'), aspect: $('#newAspect').value } });
-  openEditor(p.id);
-};
+
+function renderAcct() {
+  const a = $('#acct');
+  if (me) {
+    a.innerHTML = `<div class="ava">${me.username.slice(0, 1).toUpperCase()}</div><div class="who"><b></b><small>Đã đăng nhập · đồng bộ đám mây</small></div><button class="btn icon" id="logoutBtn" title="Đăng xuất">⎋</button>`;
+    a.querySelector('b').textContent = me.username;
+    $('#logoutBtn').onclick = logout;
+  } else {
+    a.innerHTML = `<div class="ava guest">👤</div><div class="who"><b>Khách</b><small>Dự án lưu trên máy này</small></div><button class="btn primary sm" id="loginBtn">Đăng nhập</button>`;
+    $('#loginBtn').onclick = () => openAuth();
+  }
+}
+
+/* ================= TRANG CHỦ ================= */
+function openHome() { show('home'); renderAcct(); renderHome(); }
+function setHomeStore(k) {
+  homeStore = k;
+  $$('.nav-i[data-store]').forEach(b => b.classList.toggle('on', b.dataset.store === k));
+  $('#projTitle').textContent = k === 'cloud' ? 'Dự án trên đám mây' : 'Dự án trên máy này';
+  renderHome();
+}
+$$('.nav-i[data-store]').forEach(b => b.onclick = () => setHomeStore(b.dataset.store));
+$('#projSearch').oninput = () => renderHome(true);
+let homeCache = [];
+async function renderHome(fromCache) {
+  const list = $('#projList');
+  if (homeStore === 'cloud' && !me) {
+    list.innerHTML = `<div class="empty"><div class="empty-ic">☁️</div><b>Đăng nhập để dùng đám mây</b><p>Dự án trên đám mây mở lại được trên mọi máy: Windows, Android, iOS.</p><button class="btn primary" id="emptyLogin">Đăng nhập</button></div>`;
+    $('#emptyLogin').onclick = () => openAuth(); return;
+  }
+  if (!fromCache) {
+    list.innerHTML = '<p class="muted">Đang tải…</p>';
+    try { homeCache = await storeOf(homeStore).listProjects(); } catch (err) { list.innerHTML = ''; return toast(err.message); }
+  }
+  const q = $('#projSearch').value.trim().toLowerCase();
+  const ps = homeCache.filter(p => !q || (p.name || '').toLowerCase().includes(q));
+  list.innerHTML = ps.length ? '' : `<div class="empty"><div class="empty-ic">🎬</div><b>${q ? 'Không tìm thấy dự án' : 'Chưa có dự án nào'}</b><p>Bấm “Tạo dự án” ở trên để bắt đầu edit.</p></div>`;
+  for (const p of ps) {
+    const d = document.createElement('div'); d.className = 'proj';
+    const ar = (p.aspect || '9:16').split(':');
+    d.innerHTML = `<div class="pthumb">${p.thumb ? `<img src="${p.thumb}" alt="">` : '<span>🎬</span>'}<i class="badge">${p.aspect || ''}</i>${p.dur ? `<i class="dur">${fmt(p.dur).replace(/\.\d$/, '')}</i>` : ''}<button class="del" title="Xóa dự án">🗑</button></div>
+      <div class="pname"></div><div class="muted small">${new Date(p.updated).toLocaleString('vi-VN')}</div>`;
+    d.querySelector('.pname').textContent = p.name;
+    d.onclick = () => openEditor(p.id, homeStore);
+    const del = d.querySelector('.del');
+    del.onclick = async ev => {
+      ev.stopPropagation();
+      if (del.dataset.confirm) { await storeOf(homeStore).deleteProject(p.id); renderHome(); }
+      else { del.dataset.confirm = 1; del.textContent = 'Xóa?'; del.classList.add('warn'); setTimeout(() => { delete del.dataset.confirm; del.textContent = '🗑'; del.classList.remove('warn'); }, 2500); }
+    };
+    list.appendChild(d);
+  }
+}
+async function newProject(aspect, files) {
+  const st = storeOf(homeStore);
+  if (homeStore === 'cloud' && !me) return openAuth(() => newProject(aspect, files));
+  try {
+    const p = await st.createProject({ name: 'Dự án ' + new Date().toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }), aspect: aspect || LS.get('lastAspect', '9:16') });
+    LS.set('lastAspect', p.data.aspect);
+    await openEditor(p.id, homeStore);
+    if (files && files.length) await importFiles(files, true);
+  } catch (err) { toast(err.message); }
+}
+$('#heroNew').onclick = () => newProject();
+$$('.qcard[data-new]').forEach(b => b.onclick = () => newProject(b.dataset.new));
+$('#quickFile').onchange = e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) newProject(null, f); };
 
 /* ================= EDITOR: STATE ================= */
 const ASPECT = { '9:16': [1080, 1920], '16:9': [1920, 1080], '1:1': [1080, 1080], '4:5': [1080, 1350] };
@@ -115,18 +171,22 @@ const trackOf = it => it.kind === 'image' ? 'video' : it.kind;
 const items = () => P.data.items;
 const projDur = () => Math.max(0, ...items().map(i => i.start + i.dur));
 const mById = id => media.find(m => m.id === id);
-const mediaUrl = m => `${SERVER}/api/media/${m.id}/file?t=${encodeURIComponent(token)}`;
+const mediaUrl = m => S.mediaUrl(m);
 
-async function openEditor(id) {
+async function openEditor(id, storeKey) {
   try {
-    const [p, ms] = await Promise.all([api('/api/projects/' + id), api('/api/media')]);
+    S = storeOf(storeKey || 'local');
+    const [p, ms] = await Promise.all([S.getProject(id), S.listMedia()]);
+    if (!p) throw new Error('Không thấy dự án');
     P = p; P.data.items = P.data.items || []; media = ms;
   } catch (err) { return toast(err.message); }
+  for (const k of Object.keys(els)) { const el = els[k]; if (el.pause) el.pause(); el.remove && el.remove(); delete els[k]; }
+  $('#storeBadge').textContent = S.kind === 'cloud' ? '☁️ Đám mây' : '💻 Trên máy';
   sel = null; time = 0; hist = []; fut = [];
   $('#projName').value = P.name; $('#aspectSel').value = P.data.aspect;
   show('editor'); setCanvasSize(); renderMedia(); renderAll(); setSave('Đã lưu');
 }
-$('#backBtn').onclick = async () => { setPlaying(false); await flushSave(); openProjects(); };
+$('#backBtn').onclick = async () => { setPlaying(false); await flushSave(); openHome(); };
 $('#projName').onchange = () => { P.name = $('#projName').value || 'Dự án'; markDirty(true); };
 $('#aspectSel').onchange = () => { pushHist(); P.data.aspect = $('#aspectSel').value; setCanvasSize(); markDirty(); };
 function setCanvasSize() { const [w, h] = ASPECT[P.data.aspect]; cv.width = w; cv.height = h; }
@@ -140,7 +200,9 @@ function markDirty(nameOnly) {
 async function flushSave() {
   clearTimeout(saveT); if (!dirty || !P) return; dirty = false;
   const data = JSON.parse(JSON.stringify(P.data));
-  try { await api('/api/projects/' + P.id, { method: 'PUT', json: { name: P.name, data } }); setSave('Đã lưu'); }
+  const first = data.items.filter(i => i.mediaId && i.kind !== 'audio').sort((a, b) => a.start - b.start)[0];
+  const fm = first && mById(first.mediaId);
+  try { await S.saveProject(P.id, { name: P.name, data, thumb: (fm && fm.thumb) || '', dur: projDur() }); setSave('Đã lưu'); }
   catch (e) { dirty = true; setSave('Lỗi lưu – thử lại'); saveT = setTimeout(flushSave, 4000); }
 }
 window.addEventListener('beforeunload', () => { if (dirty) flushSave(); });
@@ -174,13 +236,14 @@ function mkThumb(src, w, h) {
 function probe(file) {
   return new Promise(res => {
     const kind = kindOf(file), url = URL.createObjectURL(file);
-    const done = r => { URL.revokeObjectURL(url); res(Object.assign({ kind }, r)); };
+    let el = null, fin = false;
+    const done = r => { if (fin) return; fin = true; if (el && el.pause) { el.pause(); el.removeAttribute('src'); el.load && el.load(); } setTimeout(() => URL.revokeObjectURL(url), 1000); res(Object.assign({ kind }, r)); };
     if (kind === 'image') {
       const im = new Image();
       im.onload = () => done({ duration: 5, width: im.naturalWidth, height: im.naturalHeight, thumb: mkThumb(im, im.naturalWidth, im.naturalHeight) });
       im.onerror = () => done({}); im.src = url; return;
     }
-    const el = document.createElement(kind); el.preload = 'metadata'; el.muted = true; el.playsInline = true; el.src = url;
+    el = document.createElement(kind); el.preload = 'metadata'; el.muted = true; el.playsInline = true; el.src = url;
     el.onerror = () => done({ duration: 0 });
     el.onloadedmetadata = () => {
       if (kind === 'audio') return done({ duration: el.duration });
@@ -190,31 +253,21 @@ function probe(file) {
     setTimeout(() => done({ duration: el.duration || 0 }), 15000);
   });
 }
-function uploadFile(file, meta, onProg) {
-  return new Promise((res, rej) => {
-    const fd = new FormData();
-    for (const [k, v] of Object.entries(meta)) if (v !== undefined) fd.append(k, v);
-    fd.append('file', file);
-    const x = new XMLHttpRequest(); x.open('POST', SERVER + '/api/media');
-    x.setRequestHeader('Authorization', 'Bearer ' + token);
-    x.upload.onprogress = e => e.lengthComputable && onProg(e.loaded / e.total);
-    x.onload = () => x.status < 300 ? res(JSON.parse(x.responseText)) : rej(new Error('Tải lên lỗi ' + x.status));
-    x.onerror = () => rej(new Error('Tải lên lỗi mạng')); x.send(fd);
-  });
-}
-$('#fileIn').onchange = async e => {
-  const files = [...e.target.files]; e.target.value = '';
+async function importFiles(files, toTimeline) {
   for (let i = 0; i < files.length; i++) {
     const f = files[i], tag = `(${i + 1}/${files.length}) ${f.name}`;
     $('#upProg').textContent = 'Đang đọc ' + tag;
     const meta = await probe(f);
+    if (window.electronAPI && window.electronAPI.pathOf) meta.path = window.electronAPI.pathOf(f) || undefined;
     try {
-      const m = await uploadFile(f, meta, p => $('#upProg').textContent = `Tải lên ${tag}: ${Math.round(p * 100)}%`);
+      const m = await S.addMedia(f, meta, p => $('#upProg').textContent = `${S.kind === 'cloud' ? 'Tải lên' : 'Đang lưu'} ${tag}: ${Math.round(p * 100)}%`);
       media.push(m); renderMedia();
+      if (toTimeline) addMedia(m);
     } catch (err) { toast(err.message); }
   }
   $('#upProg').textContent = '';
-};
+}
+$('#fileIn').onchange = e => { const files = [...e.target.files]; e.target.value = ''; importFiles(files); };
 function renderMedia() {
   const g = $('#mediaGrid'); g.innerHTML = '';
   if (!media.length) g.innerHTML = '<p class="muted small" style="grid-column:1/-1">Chưa có file. Nhập video, ảnh hoặc nhạc để bắt đầu.</p>';
@@ -228,7 +281,7 @@ function renderMedia() {
     d.querySelector('.rm').onclick = async ev => {
       ev.stopPropagation();
       if (items().some(i => i.mediaId === m.id)) return toast('File đang dùng trong dự án, xóa clip trước');
-      await api('/api/media/' + m.id, { method: 'DELETE' }); media = media.filter(x => x.id !== m.id); renderMedia();
+      await S.deleteMedia(m.id); media = media.filter(x => x.id !== m.id); renderMedia();
     };
     g.appendChild(d);
   }
@@ -302,25 +355,25 @@ function drawFit(src, sw, sh, it, W, H) {
   const w = sw * s, h = sh * s;
   ctx.drawImage(src, (W - w) / 2 + (it.x || 0) * W, (H - h) / 2 + (it.y || 0) * H, w, h);
 }
-function roundRect(x, y, w, h, r) {
-  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+function roundRect(x, y, w, h, r, g = ctx) {
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
 }
-function drawText(it, W, H) {
+function drawText(it, W, H, g = ctx) {
   const lines = String(it.text || '').split('\n'), size = it.size || 64, lh = size * 1.22;
-  ctx.font = `normal ${it.bold ? 800 : 600} ${size}px Montserrat, sans-serif`; // luôn chữ đứng, không nghiêng
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const wMax = Math.max(...lines.map(l => ctx.measureText(l).width), 10);
+  g.font = `normal ${it.bold ? 800 : 600} ${size}px Montserrat, sans-serif`; // luôn chữ đứng, không nghiêng
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  const wMax = Math.max(...lines.map(l => g.measureText(l).width), 10);
   const cx = it.x * W, cy = it.y * H, top = cy - (lines.length * lh) / 2;
   const box = { x: cx - wMax / 2 - size * 0.4, y: top - size * 0.2, w: wMax + size * 0.8, h: lines.length * lh + size * 0.4 };
-  textBoxes.set(it.id, box);
-  if (it.bg) { ctx.fillStyle = it.bgColor || '#152758'; roundRect(box.x, box.y, box.w, box.h, size * 0.25); ctx.fill(); }
+  if (g === ctx) textBoxes.set(it.id, box);
+  if (it.bg) { g.fillStyle = it.bgColor || '#152758'; roundRect(box.x, box.y, box.w, box.h, size * 0.25, g); g.fill(); }
   lines.forEach((l, i) => {
     const y = top + lh * (i + 0.5);
-    if (it.stroke) { ctx.lineWidth = size * 0.14; ctx.lineJoin = 'round'; ctx.strokeStyle = it.strokeColor || '#000'; ctx.strokeText(l, cx, y); }
-    ctx.fillStyle = it.color || '#fff'; ctx.fillText(l, cx, y);
+    if (it.stroke) { g.lineWidth = size * 0.14; g.lineJoin = 'round'; g.strokeStyle = it.strokeColor || '#000'; g.strokeText(l, cx, y); }
+    g.fillStyle = it.color || '#fff'; g.fillText(l, cx, y);
   });
-  if (it.id === sel && !exporting) { ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 4; ctx.setLineDash([16, 10]); ctx.strokeRect(box.x, box.y, box.w, box.h); ctx.setLineDash([]); }
+  if (g === ctx && it.id === sel && !exporting) { g.strokeStyle = '#ffd34d'; g.lineWidth = 4; g.setLineDash([16, 10]); g.strokeRect(box.x, box.y, box.w, box.h); g.setLineDash([]); }
 }
 function drawSafeZone(W, H) {
   if (P.data.aspect !== '9:16') return;
@@ -576,6 +629,7 @@ async function waitReady(ms = 8000) {
 }
 $('#exportBtn').onclick = async () => {
   if (!projDur()) return toast('Timeline đang trống');
+  if (window.electronAPI && window.electronAPI.hasEngine) return openNativeExport();
   const mime = pickMime(); if (!mime) return toast('Thiết bị này chưa hỗ trợ xuất video');
   exExt = mime.includes('mp4') ? 'mp4' : 'webm';
   await flushSave(); setPlaying(false); ensureAudio();
@@ -610,11 +664,96 @@ $('#exDl').onclick = async e => {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
 };
 
+/* ---- Xuất bằng lõi FFmpeg (app Windows / Linux) ---- */
+const RES = { '720p': 720, '1080p': 1080, '2K': 1440, '4K': 2160 };
+let nativeBusy = false, nativeOut = '';
+function outSize(resKey) {
+  const [W, H] = ASPECT[P.data.aspect], short = RES[resKey] || 1080, k = short / Math.min(W, H);
+  return [Math.round(W * k / 2) * 2, Math.round(H * k / 2) * 2];
+}
+function openNativeExport() {
+  setPlaying(false);
+  const m = $('#nexModal'); m.classList.remove('hidden');
+  $('#nexForm').classList.remove('hidden'); $('#nexRun').classList.add('hidden');
+  $('#nexName').value = (P.name || 'video').replace(/[\\/:*?"<>|]+/g, '_');
+  $('#nexRes').value = LS.get('exRes', '1080p'); $('#nexFps').value = LS.get('exFps', '30'); $('#nexQ').value = LS.get('exQ', 'high');
+  updateNexInfo();
+}
+function updateNexInfo() {
+  const [w, h] = outSize($('#nexRes').value);
+  $('#nexInfo').textContent = `${w}×${h} · ${$('#nexFps').value} fps · ${fmt(projDur())} · MP4 (H.264 + AAC)`;
+}
+['#nexRes', '#nexFps', '#nexQ'].forEach(id => $(id).onchange = updateNexInfo);
+$('#nexClose').onclick = () => { if (!nativeBusy) $('#nexModal').classList.add('hidden'); };
+async function textPngs(outW, outH) {
+  const [W] = ASPECT[P.data.aspect], k = outW / W, res = {}, tmp = [];
+  if (document.fonts) { try { await document.fonts.load('800 60px Montserrat'); await document.fonts.load('600 60px Montserrat'); } catch {} }
+  for (const it of items().filter(i => i.kind === 'text' && String(i.text || '').trim())) {
+    const c = document.createElement('canvas'); c.width = outW; c.height = outH;
+    const g = c.getContext('2d'); g.scale(k, k);
+    drawText(it, ASPECT[P.data.aspect][0], ASPECT[P.data.aspect][1], g);
+    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    const f = await window.electronAPI.writeTemp('text-' + it.id + '.png', await blob.arrayBuffer());
+    res[it.id] = f; tmp.push(f);
+  }
+  return { res, tmp };
+}
+async function mediaFiles(setStep) {
+  const used = [...new Set(items().filter(i => i.mediaId).map(i => i.mediaId))];
+  const ms = used.map(mById).filter(Boolean);
+  const ok = await window.electronAPI.existing(ms.map(m => m.path || ''));
+  const out = {}, tmp = [];
+  for (let i = 0; i < ms.length; i++) {
+    const m = ms[i];
+    let p = ok[i] ? m.path : '';
+    if (!p) { // file không còn ở chỗ cũ hoặc nằm trên đám mây: ghi ra file tạm
+      setStep(`Đang chuẩn bị ${m.name}…`);
+      const r = await fetch(mediaUrl(m)); if (!r.ok) throw new Error('Không đọc được ' + m.name);
+      p = await window.electronAPI.writeTemp(m.name, await r.arrayBuffer()); tmp.push(p);
+    }
+    out[m.id] = { path: p, width: m.width, height: m.height };
+  }
+  return { out, tmp };
+}
+$('#nexGo').onclick = async () => {
+  const name = ($('#nexName').value.trim() || 'video').replace(/[\\/:*?"<>|]+/g, '_') + '.mp4';
+  LS.set('exRes', $('#nexRes').value); LS.set('exFps', $('#nexFps').value); LS.set('exQ', $('#nexQ').value);
+  const out = await window.electronAPI.chooseSave(name); if (!out) return;
+  const [outW, outH] = outSize($('#nexRes').value), fps = +$('#nexFps').value;
+  const Q = { std: [23, 'veryfast'], high: [19, 'veryfast'], best: [17, 'medium'] }[$('#nexQ').value] || [19, 'veryfast'];
+  nativeBusy = true; nativeOut = out;
+  $('#nexForm').classList.add('hidden'); $('#nexRun').classList.remove('hidden');
+  $('#nexDone').classList.add('hidden'); $('#nexCancel').classList.remove('hidden');
+  const step = t => $('#nexStep').textContent = t; const bar = p => { $('#nexBar').style.width = Math.round(p * 100) + '%'; $('#nexPct').textContent = Math.round(p * 100) + '%'; };
+  bar(0); step('Đang chuẩn bị…');
+  const t0 = Date.now(); let tempFiles = [];
+  try {
+    await flushSave();
+    const mf = await mediaFiles(step); tempFiles.push(...mf.tmp);
+    const tp = await textPngs(outW, outH); tempFiles.push(...tp.tmp);
+    const [W, H] = ASPECT[P.data.aspect];
+    step('Đang dựng video bằng lõi FFmpeg…');
+    window.electronAPI.onExportProgress(p => { bar(p); const el = (Date.now() - t0) / 1000; if (p > 0.02) step(`Đang dựng video… còn khoảng ${Math.max(1, Math.round(el / p - el))} giây`); });
+    await window.electronAPI.exportStart({
+      W, H, outW, outH, fps, crf: Q[0], preset: Q[1], duration: projDur(), out,
+      items: JSON.parse(JSON.stringify(items())), media: mf.out, textPng: tp.res, tempFiles,
+    });
+    bar(1); step(`Xong sau ${((Date.now() - t0) / 1000).toFixed(1)} giây · ${out}`);
+    $('#nexDone').classList.remove('hidden'); $('#nexCancel').classList.add('hidden');
+  } catch (err) {
+    step(err.cancelled || /Đã hủy/.test(err.message) ? 'Đã hủy xuất video' : 'Lỗi: ' + err.message);
+    $('#nexCancel').classList.add('hidden'); $('#nexDone').classList.remove('hidden'); $('#nexOpen').classList.add('hidden');
+  } finally { nativeBusy = false; }
+};
+$('#nexCancel').onclick = () => window.electronAPI.exportCancel();
+$('#nexOpen').onclick = () => nativeOut && window.electronAPI.showItem(nativeOut);
+$('#nexOk').onclick = () => { $('#nexModal').classList.add('hidden'); $('#nexOpen').classList.remove('hidden'); };
+
 /* ================= KHỞI ĐỘNG ================= */
 (async () => {
   if (document.fonts) document.fonts.load('600 40px Montserrat').catch(() => {});
+  openHome();
   if (token && SERVER) {
-    try { me = await api('/api/me'); return openProjects(); } catch {}
+    try { me = await api('/api/me'); renderAcct(); } catch { me = null; renderAcct(); }
   }
-  show('auth');
 })();

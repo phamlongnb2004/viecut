@@ -163,7 +163,7 @@ app.delete('/api/media/:id', auth, (req, res) => {
 const mine = req => db.projects.find(p => p.id === req.params.id && p.owner === req.user.id);
 app.get('/api/projects', auth, (req, res) => {
   res.json(db.projects.filter(p => p.owner === req.user.id)
-    .map(p => ({ id: p.id, name: p.name, updated: p.updated, aspect: p.data?.aspect }))
+    .map(p => ({ id: p.id, name: p.name, updated: p.updated, aspect: p.data?.aspect, thumb: p.thumb || '', dur: p.dur || 0 }))
     .sort((a, b) => b.updated - a.updated));
 });
 app.post('/api/projects', auth, (req, res) => {
@@ -176,6 +176,8 @@ app.put('/api/projects/:id', auth, (req, res) => {
   const p = mine(req); if (!p) return res.status(404).end();
   if (req.body.name !== undefined) p.name = String(req.body.name).slice(0, 100);
   if (req.body.data !== undefined) p.data = req.body.data;
+  if (typeof req.body.thumb === 'string' && req.body.thumb.length < 200000) p.thumb = req.body.thumb;
+  if (req.body.dur !== undefined) p.dur = Number(req.body.dur) || 0;
   p.updated = Date.now(); saveDb(); res.json({ ok: true, updated: p.updated });
 });
 app.delete('/api/projects/:id', auth, (req, res) => {

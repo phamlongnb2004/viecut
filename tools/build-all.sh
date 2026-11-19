@@ -21,6 +21,16 @@ sed -i "s/android:versionCode=\"[0-9]*\"/android:versionCode=\"$CODE\"/; s/andro
 
 cd "$A"; [ -d node_modules ] || npm install
 
+echo "== Lõi FFmpeg"
+FF="$A/vendor/ffmpeg"
+if [ ! -f "$FF/win/ffmpeg.exe" ] || [ ! -f "$FF/linux/ffmpeg" ]; then
+  T=$(mktemp -d); mkdir -p "$FF/win" "$FF/linux"
+  curl -sSL -o "$T/w.zip" https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip
+  curl -sSL -o "$T/l.tar.xz" https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+  mkdir -p "$T/w" "$T/l"; unzip -q "$T/w.zip" -d "$T/w"; tar xJf "$T/l.tar.xz" -C "$T/l"
+  cp "$T"/w/*/bin/ffmpeg.exe "$FF/win/"; cp "$T"/l/*/bin/ffmpeg "$FF/linux/"; cp "$T"/w/*/LICENSE.txt "$FF/LICENSE-ffmpeg.txt"; rm -rf "$T"
+fi
+
 echo "== Windows"
 rm -rf dist
 npx electron-builder --win dir --x64 -c.win.signAndEditExecutable=false >/dev/null
