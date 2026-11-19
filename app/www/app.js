@@ -158,7 +158,24 @@ $$('.qcard[data-new]').forEach(b => b.onclick = () => newProject(b.dataset.new))
 $('#quickFile').onchange = e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) newProject(null, f); };
 
 /* ================= EDITOR: STATE ================= */
-const ASPECT = { '9:16': [1080, 1920], '16:9': [1920, 1080], '1:1': [1080, 1080], '4:5': [1080, 1350] };
+const ASPECT = { '16:9': [1920, 1080], '4:3': [1440, 1080], '2.35:1': [2538, 1080], '2:1': [2160, 1080], '1.85:1': [1998, 1080],
+  '9:16': [1080, 1920], '3:4': [1080, 1440], '5.8-inch': [1080, 2338], '1:1': [1080, 1080], '4:5': [1080, 1350] };
+function dims(a) {
+  a = a || (P && P.data.aspect) || '9:16';
+  if (ASPECT[a]) return ASPECT[a];
+  if (a === 'orig') { // theo video/ảnh đầu tiên
+    const f = P && P.data.items.filter(i => i.mediaId && i.kind !== 'audio').sort((x, y) => x.start - y.start)[0];
+    const m = f && mById(f.mediaId);
+    if (m && m.width && m.height) { const k = 1080 / Math.min(m.width, m.height); return [Math.round(m.width * k / 2) * 2, Math.round(m.height * k / 2) * 2]; }
+    return ASPECT['16:9'];
+  }
+  return ASPECT['9:16'];
+}
+/* trạng thái track: khóa / ẩn / tắt tiếng */
+const trk = id => { P.data.tracks = P.data.tracks || {}; return P.data.tracks[id] = P.data.tracks[id] || {}; };
+const hiddenItem = it => !!(P.data.tracks && P.data.tracks[trackOf(it)] && P.data.tracks[trackOf(it)].hide);
+const mutedItem = it => !!(P.data.tracks && P.data.tracks[trackOf(it)] && P.data.tracks[trackOf(it)].mute);
+const lockedItem = it => !!(P.data.tracks && P.data.tracks[trackOf(it)] && P.data.tracks[trackOf(it)].lock);
 const TRACKS = [{ id: 'text', name: 'Chữ' }, { id: 'video', name: 'Video' }, { id: 'audio', name: 'Âm thanh' }];
 const COLORS = ['#FFFFFF', '#000000', '#C1272C', '#152758'];
 const FPS = 30;
@@ -184,15 +201,15 @@ async function openEditor(id, storeKey) {
   $('#storeBadge').textContent = S.kind === 'cloud' ? '☁️ Đám mây' : '💻 Trên máy';
   sel = null; time = 0; hist = []; fut = [];
   $('#projName').value = P.name; $('#aspectSel').value = P.data.aspect;
-  show('editor'); setCanvasSize(); renderMedia(); renderAll(); setSave('Đã lưu');
+  show('editor'); setCanvasSize(); setAssetTab('media'); renderAll(); setSave('Đã lưu');
 }
 $('#backBtn').onclick = async () => { setPlaying(false); await flushSave(); openHome(); };
 $('#projName').onchange = () => { P.name = $('#projName').value || 'Dự án'; markDirty(true); };
 $('#aspectSel').onchange = () => { pushHist(); P.data.aspect = $('#aspectSel').value; setCanvasSize(); markDirty(); };
-function setCanvasSize() { const [w, h] = ASPECT[P.data.aspect]; cv.width = w; cv.height = h; }
+function setCanvasSize() { const [w, h] = dims(); if (cv.width !== w) cv.width = w; if (cv.height !== h) cv.height = h; }
 
 /* ---- lưu tự động ---- */
-function setSave(s) { $('#saveState').textContent = s; }
+function setSave(s) { $('#saveState').textContent = s === 'Đã lưu' ? '✓ Tự động lưu: ' + new Date().toLocaleTimeString('vi-VN') : s; }
 function markDirty(nameOnly) {
   dirty = true; setSave('Đang lưu…'); renderAll();
   clearTimeout(saveT); saveT = setTimeout(flushSave, nameOnly ? 300 : 1200);
@@ -215,10 +232,25 @@ function afterHist() { if (sel && !items().find(i => i.id === sel)) sel = null; 
 $('#undoBtn').onclick = undo; $('#redoBtn').onclick = redo;
 
 /* ================= MEDIA ================= */
-$$('.tab').forEach(t => t.onclick = () => {
-  $$('.tab').forEach(x => x.classList.toggle('active', x === t));
-  $$('.tab-body').forEach(b => b.classList.toggle('hidden', b.id !== 'tab-' + t.dataset.tab));
-});
+let assetTab = 'media', mediaFilter = 'all';
+const SUBS = { media: [['all', 'Tất cả'], ['video', 'Video'], ['image', 'Ảnh']], audio: [['audio', 'Nhạc & âm thanh']], text: [['text', 'Mẫu chữ']] };
+function setAssetTab(t) {
+  assetTab = t;
+  $$('.cat-i').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  const body = (t === 'media' || t === 'audio') ? 'media' : t === 'text' ? 'text' : 'soon';
+  $$('.tab-body').forEach(b => b.classList.toggle('hidden', b.id !== 'tab-' + body));
+  if (t === 'audio') mediaFilter = 'audio'; else if (t === 'media') mediaFilter = 'all';
+  const subs = SUBS[t] || [['soon', 'Sắp có']];
+  $('#subNav').innerHTML = subs.map(([k, l], i) => `<button class="sub-i ${i === 0 ? 'on' : ''}" data-f="${k}">${l}</button>`).join('');
+  $$('#subNav .sub-i').forEach(b => b.onclick = () => {
+    $$('#subNav .sub-i').forEach(x => x.classList.toggle('on', x === b));
+    if (t === 'media') { mediaFilter = b.dataset.f; renderMedia(); }
+  });
+  $('#fileIn').accept = t === 'audio' ? 'audio/*' : 'video/*,audio/*,image/*';
+  if (body === 'media') renderMedia();
+}
+$$('.cat-i').forEach(b => b.onclick = () => setAssetTab(b.dataset.tab));
+$('#mediaSearch').oninput = () => renderMedia();
 function kindOf(file) {
   if (file.type.startsWith('image')) return 'image';
   if (file.type.startsWith('audio')) return 'audio';
@@ -270,8 +302,10 @@ async function importFiles(files, toTimeline) {
 $('#fileIn').onchange = e => { const files = [...e.target.files]; e.target.value = ''; importFiles(files); };
 function renderMedia() {
   const g = $('#mediaGrid'); g.innerHTML = '';
-  if (!media.length) g.innerHTML = '<p class="muted small" style="grid-column:1/-1">Chưa có file. Nhập video, ảnh hoặc nhạc để bắt đầu.</p>';
-  for (const m of [...media].reverse()) {
+  const q = ($('#mediaSearch').value || '').trim().toLowerCase();
+  const list = media.filter(m => (mediaFilter === 'all' || m.kind === mediaFilter) && (!q || (m.name || '').toLowerCase().includes(q)));
+  if (!list.length) g.innerHTML = `<p class="muted small" style="grid-column:1/-1">${media.length ? 'Không có tệp phù hợp.' : 'Chưa có tệp. Bấm ＋ Nhập hoặc kéo file vào cửa sổ.'}</p>`;
+  for (const m of [...list].reverse()) {
     const d = document.createElement('div'); d.className = 'media'; d.title = m.name;
     d.innerHTML = (m.thumb ? `<img src="${m.thumb}">` : `<div class="ph">${m.kind === 'audio' ? '♪' : '▶'}</div>`) +
       `<div class="meta"></div><span class="dur">${m.kind === 'image' ? 'Ảnh' : fmt(m.duration)}</span><button class="add" title="Thêm vào timeline">+</button><button class="rm" title="Xóa khỏi thư viện">×</button>`;
@@ -349,31 +383,105 @@ function syncMedia(el, target, shouldPlay, vol) {
     if (Math.abs(el.currentTime - target) > 0.03 && !el.seeking) el.currentTime = target;
   }
 }
+const mediaBoxes = new Map();
+function fitBox(sw, sh, it, W, H) {
+  const s = (it.fit === 'cover' ? Math.max(W / sw, H / sh) : Math.min(W / sw, H / sh)) * (it.scale || 1);
+  return { cx: W / 2 + (it.x || 0) * W, cy: H / 2 + (it.y || 0) * H, w: sw * s, h: sh * s, rot: it.rot || 0 };
+}
 function drawFit(src, sw, sh, it, W, H) {
   if (!sw || !sh) return;
-  const s = (it.fit === 'cover' ? Math.max(W / sw, H / sh) : Math.min(W / sw, H / sh)) * (it.scale || 1);
-  const w = sw * s, h = sh * s;
-  ctx.drawImage(src, (W - w) / 2 + (it.x || 0) * W, (H - h) / 2 + (it.y || 0) * H, w, h);
+  const b = fitBox(sw, sh, it, W, H); mediaBoxes.set(it.id, b);
+  ctx.save(); ctx.globalAlpha = it.opacity ?? 1; ctx.translate(b.cx, b.cy); ctx.rotate(b.rot * Math.PI / 180);
+  ctx.drawImage(src, -b.w / 2, -b.h / 2, b.w, b.h); ctx.restore();
 }
 function roundRect(x, y, w, h, r, g = ctx) {
   g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
   g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
 }
-function drawText(it, W, H, g = ctx) {
-  const lines = String(it.text || '').split('\n'), size = it.size || 64, lh = size * 1.22;
-  g.font = `normal ${it.bold ? 800 : 600} ${size}px Montserrat, sans-serif`; // luôn chữ đứng, không nghiêng
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  const wMax = Math.max(...lines.map(l => g.measureText(l).width), 10);
-  const cx = it.x * W, cy = it.y * H, top = cy - (lines.length * lh) / 2;
-  const box = { x: cx - wMax / 2 - size * 0.4, y: top - size * 0.2, w: wMax + size * 0.8, h: lines.length * lh + size * 0.4 };
-  if (g === ctx) textBoxes.set(it.id, box);
-  if (it.bg) { g.fillStyle = it.bgColor || '#152758'; roundRect(box.x, box.y, box.w, box.h, size * 0.25, g); g.fill(); }
+/* ---- hiệu ứng động của chữ ---- */
+const ANIMS = {
+  in: [['none', 'Không có'], ['fade', 'Mờ dần'], ['slideUp', 'Trượt lên'], ['slideDown', 'Trượt xuống'], ['slideLeft', 'Trượt trái'], ['slideRight', 'Trượt phải'],
+    ['zoomIn', 'Phóng to'], ['zoomOut', 'Thu vào'], ['typewriter', 'Gõ chữ'], ['bounce', 'Nảy'], ['spin', 'Xoay vào']],
+  out: [['none', 'Không có'], ['fade', 'Mờ dần'], ['slideUp', 'Trượt lên'], ['slideDown', 'Trượt xuống'], ['slideLeft', 'Trượt trái'], ['slideRight', 'Trượt phải'],
+    ['zoomIn', 'Phóng ra'], ['zoomOut', 'Thu nhỏ'], ['typewriter', 'Xóa chữ'], ['bounce', 'Nảy'], ['spin', 'Xoay ra']],
+  loop: [['none', 'Không có'], ['blink', 'Nhấp nháy'], ['shake', 'Rung lắc'], ['pulse', 'Nhịp đập'], ['float', 'Lơ lửng'], ['swing', 'Đung đưa']],
+};
+const easeOut = p => 1 - Math.pow(1 - p, 3);
+const easeBack = p => { const c = 1.7; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); };
+function animDurs(it) {
+  const A = it.anim || {}, half = it.dur / 2;
+  return { inD: A.in && A.in.type !== 'none' ? Math.min(A.in.dur || 0.5, half) : 0, outD: A.out && A.out.type !== 'none' ? Math.min(A.out.dur || 0.5, half) : 0,
+    loop: A.loop && A.loop.type !== 'none' ? (1 / (A.loop.speed || 1)) : 0 };
+}
+function animState(it, tl) {
+  const st = { a: 1, dx: 0, dy: 0, sc: 1, rot: 0, frac: 1 }, A = it.anim || {}, d = animDurs(it);
+  const apply = (type, p) => {
+    const e = easeOut(p);
+    if (type === 'fade') st.a *= e;
+    else if (type === 'slideUp') { st.dy += (1 - e) * 0.12; st.a *= e; }
+    else if (type === 'slideDown') { st.dy -= (1 - e) * 0.12; st.a *= e; }
+    else if (type === 'slideLeft') { st.dx += (1 - e) * 0.25; st.a *= e; }
+    else if (type === 'slideRight') { st.dx -= (1 - e) * 0.25; st.a *= e; }
+    else if (type === 'zoomIn') { st.sc *= 0.3 + 0.7 * e; st.a *= e; }
+    else if (type === 'zoomOut') { st.sc *= 1 + (1 - e) * 0.8; st.a *= e; }
+    else if (type === 'typewriter') st.frac = Math.min(st.frac, p);
+    else if (type === 'bounce') { st.sc *= Math.max(0, easeBack(p)); }
+    else if (type === 'spin') { st.rot += (1 - e) * 180; st.sc *= 0.4 + 0.6 * e; st.a *= e; }
+  };
+  if (d.inD && tl < d.inD) apply(A.in.type, Math.max(0, tl / d.inD));
+  if (d.outD && tl > it.dur - d.outD) apply(A.out.type, Math.max(0, (it.dur - tl) / d.outD));
+  if (d.loop) {
+    const ph = 2 * Math.PI * ((tl % d.loop) / d.loop), tp = A.loop.type;
+    if (tp === 'blink') st.a *= 0.35 + 0.65 * (0.5 + 0.5 * Math.cos(ph));
+    else if (tp === 'shake') st.dx += Math.sin(ph * 3) * 0.008;
+    else if (tp === 'pulse') st.sc *= 1 + 0.07 * Math.sin(ph);
+    else if (tp === 'float') st.dy += Math.sin(ph) * 0.012;
+    else if (tp === 'swing') st.rot += Math.sin(ph) * 7;
+  }
+  return st;
+}
+function textCase(t, m) {
+  if (m === 'upper') return t.toLocaleUpperCase('vi');
+  if (m === 'lower') return t.toLocaleLowerCase('vi');
+  if (m === 'title') return t.toLocaleLowerCase('vi').replace(/(^|\s)(\S)/g, (x, a, b) => a + b.toLocaleUpperCase('vi'));
+  return t;
+}
+function drawText(it, W, H, g = ctx, tl = null) {
+  const st = tl === null ? { a: 1, dx: 0, dy: 0, sc: 1, rot: 0, frac: 1 } : animState(it, tl);
+  let lines = textCase(String(it.text || ''), it.caseMode).split('\n');
+  if (st.frac < 1) { // gõ chữ: hiện dần từng ký tự
+    let n = Math.floor(lines.join('').length * st.frac);
+    lines = lines.map(l => { const c = l.slice(0, Math.max(0, n)); n -= l.length; return c; });
+  }
+  const size = it.size || 64, lh = size * (it.lineH || 1.22), fam = it.font || 'Montserrat';
+  g.save();
+  g.font = `${it.italic ? 'italic' : 'normal'} ${it.bold ? 800 : 500} ${size}px "${fam}", Montserrat, sans-serif`; // mặc định chữ đứng
+  try { g.letterSpacing = (it.spacing || 0) + 'px'; } catch {}
+  g.textBaseline = 'middle';
+  const full = textCase(String(it.text || ''), it.caseMode).split('\n');
+  const wMax = Math.max(...full.map(l => g.measureText(l).width), 10);
+  const bw = wMax + size * 0.8, bh = full.length * lh + size * 0.4;
+  const cx = it.x * W + st.dx * W, cy = it.y * H + st.dy * H, rot = (it.rot || 0) + st.rot;
+  if (g === ctx) textBoxes.set(it.id, { cx: it.x * W, cy: it.y * H, w: bw, h: bh, rot: it.rot || 0 });
+  g.globalAlpha = (it.opacity ?? 1) * st.a;
+  g.translate(cx, cy); g.rotate(rot * Math.PI / 180); g.scale(st.sc, st.sc);
+  const al = it.align || 'center', ax = al === 'left' ? -wMax / 2 : al === 'right' ? wMax / 2 : 0;
+  g.textAlign = al;
+  if (it.bg) { g.fillStyle = it.bgColor || '#152758'; roundRect(-bw / 2, -bh / 2, bw, bh, size * 0.25, g); g.fill(); }
+  const top = -(full.length * lh) / 2;
+  const shadow = () => { if (it.shadow) { g.shadowColor = it.shadowColor || 'rgba(0,0,0,.6)'; g.shadowBlur = it.shadowBlur ?? 12; g.shadowOffsetX = it.shadowX ?? 4; g.shadowOffsetY = it.shadowY ?? 6; } };
+  const noShadow = () => { g.shadowColor = 'transparent'; g.shadowBlur = 0; g.shadowOffsetX = 0; g.shadowOffsetY = 0; };
   lines.forEach((l, i) => {
     const y = top + lh * (i + 0.5);
-    if (it.stroke) { g.lineWidth = size * 0.14; g.lineJoin = 'round'; g.strokeStyle = it.strokeColor || '#000'; g.strokeText(l, cx, y); }
-    g.fillStyle = it.color || '#fff'; g.fillText(l, cx, y);
+    if (it.stroke) { shadow(); g.lineWidth = size * (it.strokeW ?? 0.14); g.lineJoin = 'round'; g.strokeStyle = it.strokeColor || '#000'; g.strokeText(l, ax, y); noShadow(); }
+    else shadow();
+    g.fillStyle = it.color || '#fff'; g.fillText(l, ax, y); noShadow();
+    if (it.underline && l) {
+      const w = g.measureText(l).width, x0 = al === 'left' ? ax : al === 'right' ? ax - w : -w / 2;
+      g.fillRect(x0, y + size * 0.45, w, Math.max(2, size * 0.06));
+    }
   });
-  if (g === ctx && it.id === sel && !exporting) { g.strokeStyle = '#ffd34d'; g.lineWidth = 4; g.setLineDash([16, 10]); g.strokeRect(box.x, box.y, box.w, box.h); g.setLineDash([]); }
+  g.restore();
 }
 function drawSafeZone(W, H) {
   if (P.data.aspect !== '9:16') return;
@@ -388,11 +496,12 @@ function draw() {
   const W = cv.width, H = cv.height, t = time;
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
   const used = new Set(), act = i => t >= i.start && t < i.start + i.dur;
-  const visual = items().filter(i => (i.kind === 'video' || i.kind === 'image') && act(i)).sort((a, b) => a.start - b.start);
+  mediaBoxes.clear(); setCanvasSize();
+  const visual = items().filter(i => (i.kind === 'video' || i.kind === 'image') && act(i) && !hiddenItem(i)).sort((a, b) => a.start - b.start);
   for (const it of items()) {
     if ((it.kind === 'video' || it.kind === 'audio') && act(it)) {
       const el = getEl(it.mediaId); if (!el) continue;
-      syncMedia(el, it.in + (t - it.start), playing, it.volume ?? 1); used.add(el);
+      syncMedia(el, it.in + (t - it.start), playing, mutedItem(it) ? 0 : (it.volume ?? 1)); used.add(el);
     }
   }
   for (const it of visual) {
@@ -410,7 +519,8 @@ function draw() {
   }
   Object.values(els).forEach(el => { if (el instanceof HTMLMediaElement && !used.has(el) && !el.paused) el.pause(); });
   textBoxes.clear();
-  items().filter(i => i.kind === 'text' && act(i)).sort((a, b) => a.start - b.start).forEach(i => drawText(i, W, H));
+  items().filter(i => i.kind === 'text' && act(i) && !hiddenItem(i)).sort((a, b) => a.start - b.start).forEach(i => drawText(i, W, H, ctx, t - i.start));
+  updateSelBox();
   if ($('#safeChk').checked && !exporting) drawSafeZone(W, H);
 }
 let lastTs = 0;
@@ -422,7 +532,7 @@ function frame(ts) {
     if (exporting) setExProg(time / d);
     if (time >= d) { time = d; setPlaying(false); if (exporting) finishExport(); }
   }
-  if (P && !$('#editor').classList.contains('hidden')) { draw(); updatePlayhead(); }
+  if (P && !nativeBusy && !$('#editor').classList.contains('hidden')) { draw(); updatePlayhead(); }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -437,29 +547,76 @@ $('#safeChk').onchange = () => {};
 
 /* ---- kéo chữ / video trên khung hình ---- */
 function canvasPt(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; }
+function inBox(p, b) { // điểm p có nằm trong hộp đã xoay b không
+  const r = -(b.rot || 0) * Math.PI / 180, dx = p.x - b.cx, dy = p.y - b.cy;
+  const x = dx * Math.cos(r) - dy * Math.sin(r), y = dx * Math.sin(r) + dy * Math.cos(r);
+  return Math.abs(x) <= b.w / 2 && Math.abs(y) <= b.h / 2;
+}
+const boxOf = it => it && (it.kind === 'text' ? textBoxes.get(it.id) : mediaBoxes.get(it.id));
 cv.addEventListener('pointerdown', e => {
   const p = canvasPt(e); let hit = null;
-  const texts = items().filter(i => i.kind === 'text' && textBoxes.has(i.id)).reverse();
-  for (const it of texts) { const b = textBoxes.get(it.id); if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) { hit = it; break; } }
-  if (!hit) hit = items().filter(i => (i.kind === 'video' || i.kind === 'image') && time >= i.start && time < i.start + i.dur).pop();
+  const vis = items().filter(i => i.kind !== 'audio' && boxOf(i) && !hiddenItem(i)).sort((a, b) => (a.kind === 'text') - (b.kind === 'text') || a.start - b.start).reverse();
+  hit = vis.find(i => inBox(p, boxOf(i)));
   if (!hit) { sel = null; renderAll(); return; }
   sel = hit.id; renderAll();
-  const snap = JSON.stringify(P.data), ox = hit.x, oy = hit.y; let moved = false;
+  if (lockedItem(hit)) return toast('Track đang khóa');
+  const snap = JSON.stringify(P.data), ox = hit.x || 0, oy = hit.y || 0; let moved = false;
   cv.setPointerCapture(e.pointerId);
   const mv = ev => {
     const q = canvasPt(ev), dx = (q.x - p.x) / cv.width, dy = (q.y - p.y) / cv.height; moved = true;
     hit.x = ox + dx; hit.y = oy + dy;
-    if (hit.kind === 'text') { if (Math.abs(hit.x - 0.5) < 0.015) hit.x = 0.5; } // hít vào giữa
-    else { if (Math.abs(hit.x) < 0.015) hit.x = 0; if (Math.abs(hit.y) < 0.015) hit.y = 0; }
+    const cx0 = hit.kind === 'text' ? 0.5 : 0, cy0 = hit.kind === 'text' ? 0.5 : 0; // hít vào giữa
+    if (Math.abs(hit.x - cx0) < 0.015) hit.x = cx0; if (Math.abs(hit.y - cy0) < 0.015) hit.y = cy0;
   };
   const up = () => { cv.removeEventListener('pointermove', mv); cv.removeEventListener('pointerup', up); if (moved) { pushHist(snap); markDirty(); } };
   cv.addEventListener('pointermove', mv); cv.addEventListener('pointerup', up);
 });
 
+/* ---- khung chọn trên trình phát: kéo góc để phóng to, nút tròn để xoay, ✕ để xóa ---- */
+const selBox = document.createElement('div'); selBox.className = 'selbox hidden';
+selBox.innerHTML = '<i class="h tl"></i><i class="h tr"></i><i class="h bl"></i><i class="h br"></i><i class="rot" title="Kéo để xoay"></i><b class="x" title="Xóa">✕</b>';
+$('#stage').style.position = 'relative'; $('#stage').appendChild(selBox);
+function updateSelBox() {
+  const it = selItem(), b = boxOf(it);
+  if (!it || !b || exporting || hiddenItem(it) || time < it.start || time >= it.start + it.dur) { selBox.classList.add('hidden'); return; }
+  const r = cv.getBoundingClientRect(), sr = $('#stage').getBoundingClientRect(), k = r.width / cv.width;
+  selBox.classList.remove('hidden');
+  Object.assign(selBox.style, { left: (r.left - sr.left + b.cx * k) + 'px', top: (r.top - sr.top + b.cy * k) + 'px', width: b.w * k + 'px', height: b.h * k + 'px',
+    transform: `translate(-50%,-50%) rotate(${b.rot || 0}deg)` });
+}
+selBox.querySelector('.x').onclick = e => { e.stopPropagation(); del(); };
+selBox.addEventListener('pointerdown', e => {
+  const it = selItem(), b = boxOf(it); if (!it || !b) return;
+  const h = e.target; if (!h.classList.contains('h') && !h.classList.contains('rot')) { // bấm giữa khung = kéo như trên canvas
+    cv.dispatchEvent(new PointerEvent('pointerdown', { clientX: e.clientX, clientY: e.clientY, pointerId: e.pointerId, bubbles: true })); return; }
+  e.preventDefault(); e.stopPropagation();
+  if (lockedItem(it)) return toast('Track đang khóa');
+  const snap = JSON.stringify(P.data), c = { x: b.cx, y: b.cy }, p0 = canvasPt(e);
+  const d0 = Math.hypot(p0.x - c.x, p0.y - c.y) || 1, a0 = Math.atan2(p0.y - c.y, p0.x - c.x), rot0 = it.rot || 0;
+  const size0 = it.size || 64, scale0 = it.scale || 1, isRot = h.classList.contains('rot');
+  selBox.setPointerCapture(e.pointerId);
+  const mv = ev => {
+    const q = canvasPt(ev);
+    if (isRot) { let r = rot0 + (Math.atan2(q.y - c.y, q.x - c.x) - a0) * 180 / Math.PI; r = ((r + 540) % 360) - 180; if (Math.abs(r) < 3) r = 0; if (Math.abs(Math.abs(r) - 90) < 3) r = Math.sign(r) * 90; it.rot = Math.round(r); }
+    else { const f = Math.max(0.05, Math.hypot(q.x - c.x, q.y - c.y) / d0); if (it.kind === 'text') it.size = Math.round(clamp(size0 * f, 8, 600)); else it.scale = +clamp(scale0 * f, 0.05, 10).toFixed(3); }
+  };
+  const up = () => { selBox.removeEventListener('pointermove', mv); selBox.removeEventListener('pointerup', up); pushHist(snap); $('#props').dataset.for = ''; markDirty(); };
+  selBox.addEventListener('pointermove', mv); selBox.addEventListener('pointerup', up);
+});
+
 /* ================= TIMELINE ================= */
-$('#tlLabels').innerHTML = TRACKS.map(t => `<div>${t.name}</div>`).join('');
+function renderTrackHeads() {
+  if (!P) return;
+  $('#tlLabels').innerHTML = TRACKS.map(t => { const s = trk(t.id); return `<div class="th" data-t="${t.id}"><span class="tn">${t.name}</span><span class="tb">
+    <button class="${s.lock ? 'on' : ''}" data-a="lock" title="${s.lock ? 'Mở khóa' : 'Khóa'} track">${s.lock ? '🔒' : '🔓'}</button>
+    <button class="${s.hide ? 'on' : ''}" data-a="hide" title="${s.hide ? 'Hiện' : 'Ẩn'} track">${s.hide ? '🙈' : '👁'}</button>
+    ${t.id !== 'text' ? `<button class="${s.mute ? 'on' : ''}" data-a="mute" title="${s.mute ? 'Bật' : 'Tắt'} tiếng">${s.mute ? '🔇' : '🔊'}</button>` : ''}</span></div>`; }).join('');
+  $$('#tlLabels button').forEach(b => b.onclick = () => { pushHist(); const s = trk(b.closest('.th').dataset.t); s[b.dataset.a] = !s[b.dataset.a]; markDirty(); });
+}
 $('#zoom').oninput = e => { zoom = +e.target.value; renderTimeline(); };
-function renderAll() { renderTimeline(); renderProps(); $('#undoBtn').disabled = !hist.length; $('#redoBtn').disabled = !fut.length; }
+$('#zoomIn').onclick = () => { zoom = Math.min(300, Math.round(zoom * 1.25)); $('#zoom').value = zoom; renderTimeline(); };
+$('#zoomOut').onclick = () => { zoom = Math.max(10, Math.round(zoom / 1.25)); $('#zoom').value = zoom; renderTimeline(); };
+function renderAll() { renderTrackHeads(); renderTimeline(); renderProps(); $('#undoBtn').disabled = !hist.length; $('#redoBtn').disabled = !fut.length; }
 function renderTimeline() {
   if (!P) return;
   const total = Math.max(projDur() + 15, 30), W = total * zoom;
@@ -471,7 +628,7 @@ function renderTimeline() {
   for (const tr of TRACKS) {
     const row = document.createElement('div'); row.className = 'track'; row.dataset.track = tr.id;
     for (const it of items().filter(i => trackOf(i) === tr.id)) {
-      const c = document.createElement('div'); c.className = `clip ${it.kind}${it.id === sel ? ' sel' : ''}`; c.dataset.id = it.id;
+      const c = document.createElement('div'); c.className = `clip ${it.kind}${it.id === sel ? ' sel' : ''}${hiddenItem(it) ? ' off' : ''}`; c.dataset.id = it.id;
       c.style.left = it.start * zoom + 'px'; c.style.width = Math.max(8, it.dur * zoom) + 'px';
       const m = it.mediaId && mById(it.mediaId);
       if (m && m.thumb) c.style.backgroundImage = `url(${m.thumb})`;
@@ -483,6 +640,7 @@ function renderTimeline() {
     tracks.appendChild(row);
   }
   $('#tdur').textContent = fmt(projDur());
+  $('#tlEmpty').classList.toggle('hidden', items().length > 0);
 }
 function updatePlayhead() { $('#playhead').style.left = time * zoom + 'px'; $('#tcur').textContent = fmt(time); }
 function snapPoints(exceptId) { const pts = [0, time]; for (const i of items()) if (i.id !== exceptId) pts.push(i.start, i.start + i.dur); return pts; }
@@ -498,6 +656,7 @@ $('#tlContent').addEventListener('pointerdown', e => {
     addEventListener('pointermove', seek); addEventListener('pointerup', up); return;
   }
   const it = items().find(i => i.id === clip.dataset.id); if (!it) return;
+  if (lockedItem(it)) { sel = it.id; renderAll(); return toast('Track đang khóa'); }
   if (sel !== it.id) { sel = it.id; renderProps(); $$('.clip').forEach(c => c.classList.toggle('sel', c === clip)); }
   const mode = e.target.classList.contains('l') ? 'l' : e.target.classList.contains('r') ? 'r' : 'move';
   const snapStr = JSON.stringify(P.data), o = { ...it }, x0 = e.clientX, pts = snapPoints(it.id);
@@ -546,71 +705,200 @@ addEventListener('keydown', e => {
   else if (k === 'arrowright') $('#stepFwd').click();
 });
 
+/* ================= KÉO THẢ FILE ================= */
+let dragN = 0;
+const isFiles = e => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+addEventListener('dragenter', e => { if ($('#editor').classList.contains('hidden') || !isFiles(e)) return; e.preventDefault(); dragN++; $('#dropVeil').classList.remove('hidden'); });
+addEventListener('dragleave', e => { if (!isFiles(e)) return; if (--dragN <= 0) { dragN = 0; $('#dropVeil').classList.add('hidden'); } });
+addEventListener('dragover', e => { if (isFiles(e)) e.preventDefault(); });
+addEventListener('drop', e => {
+  if (!isFiles(e)) return; e.preventDefault(); dragN = 0; $('#dropVeil').classList.add('hidden');
+  if ($('#editor').classList.contains('hidden')) return;
+  const files = [...e.dataTransfer.files].filter(f => /^(video|audio|image)\//.test(f.type) || /\.(mp4|mov|mkv|webm|avi|mp3|wav|m4a|aac|ogg|flac|png|jpe?g|webp|gif)$/i.test(f.name));
+  if (!files.length) return toast('Chỉ nhận video, ảnh hoặc nhạc');
+  const onTimeline = !!document.elementFromPoint(e.clientX, e.clientY)?.closest('#timeline');
+  importFiles(files, onTimeline);
+});
+
 /* ================= BẢNG THUỘC TÍNH ================= */
+let propTab = 'text', propSub = 'basic', animSub = 'in';
+function slider(label, key, min, max, step, val, unit = '') {
+  return `<div class="prop"><label>${label}<span class="numw"><input type="number" class="num" data-k="${key}" data-num min="${min}" max="${max}" step="${step}" value="${val}">${unit}</span></label>
+    <input type="range" data-k="${key}" data-num min="${min}" max="${max}" step="${step}" value="${val}"></div>`;
+}
+const segBtns = (key, cur, opts) => `<div class="seg">${opts.map(([v, l, t]) => `<button class="btn ${String(cur) === String(v) ? 'on' : ''}" data-set="${key}" data-v="${v}" title="${t || ''}">${l}</button>`).join('')}</div>`;
 function renderProps() {
   const box = $('#props'), it = selItem();
-  if (!it) { box.innerHTML = '<div class="props"><h4>Thuộc tính</h4><p class="muted small">Chọn một clip trên timeline hoặc khung hình để chỉnh.<br><br>Phím tắt: Space phát/dừng · S tách · Delete xóa · Ctrl+Z hoàn tác</p></div>'; return; }
-  if (box.dataset.for === it.id && box.contains(document.activeElement) && document.activeElement !== document.body) return; // đang gõ
+  if (!it) { box.dataset.for = ''; box.innerHTML = '<div class="props-empty"><div class="empty-ic">👆</div><b>Chưa chọn gì</b><p class="muted small">Bấm một clip trên timeline hoặc trên khung hình để chỉnh.</p><p class="muted small">Space phát/dừng · S tách · Delete xóa · Ctrl+Z hoàn tác</p></div>'; return; }
+  if (box.dataset.for === it.id && box.contains(document.activeElement) && document.activeElement !== document.body && document.activeElement.tagName !== 'BUTTON') return; // đang gõ
   box.dataset.for = it.id;
-  const names = { video: 'Video', image: 'Ảnh', audio: 'Âm thanh', text: 'Chữ' };
-  let h = `<div class="props"><h4>${names[it.kind]}</h4>
-    <div class="prop"><label>Bắt đầu <b>${fmt(it.start)}</b></label><label>Thời lượng <b>${it.dur.toFixed(2)} s</b></label></div>`;
+  let h = '';
   if (it.kind === 'text') {
-    h += `<div class="prop"><label>Nội dung</label><textarea data-k="text"></textarea></div>
-      <div class="prop"><label>Cỡ chữ <b>${it.size}</b></label><input type="range" min="20" max="260" data-k="size" data-num value="${it.size}"></div>
-      <div class="prop"><label>Màu chữ</label>${swatches('color', it.color)}</div>
-      <div class="prop"><label>Kiểu</label><div class="seg">
-        <button class="btn ${it.bold ? 'on' : ''}" data-toggle="bold">Đậm</button>
-        <button class="btn ${it.stroke ? 'on' : ''}" data-toggle="stroke">Viền</button>
-        <button class="btn ${it.bg ? 'on' : ''}" data-toggle="bg">Nền</button></div></div>
-      ${it.stroke ? `<div class="prop"><label>Màu viền</label>${swatches('strokeColor', it.strokeColor)}</div>` : ''}
-      ${it.bg ? `<div class="prop"><label>Màu nền</label>${swatches('bgColor', it.bgColor)}</div>` : ''}
-      <div class="prop"><label>Vị trí nhanh</label><div class="seg">
-        <button class="btn" data-pos="0.2">Trên</button><button class="btn" data-pos="0.5">Giữa</button><button class="btn" data-pos="0.7">Dưới</button></div></div>`;
+    if (!['text', 'anim'].includes(propTab)) propTab = 'text';
+    h += `<div class="ptabs"><button class="${propTab === 'text' ? 'on' : ''}" data-ptab="text">Văn bản</button><button class="${propTab === 'anim' ? 'on' : ''}" data-ptab="anim">Hiệu ứng động</button></div>`;
+    if (propTab === 'text') {
+      h += `<div class="psub"><button class="${propSub === 'basic' ? 'on' : ''}" data-psub="basic">Cơ bản</button><button class="${propSub === 'shadow' ? 'on' : ''}" data-psub="shadow">Bóng đổ</button><button class="${propSub === 'more' ? 'on' : ''}" data-psub="more">Nâng cao</button></div>`;
+      if (propSub === 'basic') {
+        h += `<div class="prop"><textarea data-k="text" rows="3" placeholder="Nhập chữ…"></textarea></div>
+        <div class="prop row2"><label>Phông chữ</label><div class="font-pick"><button class="btn font-cur" data-fontbtn style="font-family:'${it.font || 'Montserrat'}'"><span>${it.font || 'Montserrat'}</span><i>▾</i></button></div></div>
+        <div class="font-pop hidden" data-fontpop></div>
+        ${slider('Cỡ chữ', 'size', 8, 400, 1, it.size || 64)}
+        <div class="prop row2"><label>Hoa văn</label><div class="seg icons">
+          <button class="btn ${it.bold ? 'on' : ''}" data-toggle="bold" title="Đậm"><b>B</b></button>
+          <button class="btn ${it.underline ? 'on' : ''}" data-toggle="underline" title="Gạch chân"><u>U</u></button>
+          <button class="btn ${it.italic ? 'on' : ''}" data-toggle="italic" title="Nghiêng"><i>I</i></button></div></div>
+        <div class="prop row2"><label>Chữ hoa/thường</label>${segBtns('caseMode', it.caseMode || 'none', [['none', 'Aa', 'Giữ nguyên'], ['upper', 'TT', 'IN HOA'], ['lower', 'tt', 'in thường'], ['title', 'Tt', 'Hoa Đầu Từ']])}</div>
+        <div class="prop row2"><label>Căn lề</label>${segBtns('align', it.align || 'center', [['left', '⯇≡', 'Căn trái'], ['center', '≡', 'Căn giữa'], ['right', '≡⯈', 'Căn phải']])}</div>
+        <div class="prop"><label>Màu chữ</label>${colorCtl('color', it.color)}</div>
+        ${slider('Độ mờ', 'opacity', 0, 1, 0.01, it.opacity ?? 1)}
+        <div class="prop row2"><label>Viền chữ</label><label class="switch"><input type="checkbox" data-check="stroke" ${it.stroke ? 'checked' : ''}><span></span></label></div>
+        ${it.stroke ? `<div class="prop sub-prop"><label>Màu viền</label>${colorCtl('strokeColor', it.strokeColor)}</div>${slider('Độ dày viền', 'strokeW', 0.02, 0.4, 0.01, it.strokeW ?? 0.14)}` : ''}
+        <div class="prop row2"><label>Nền chữ</label><label class="switch"><input type="checkbox" data-check="bg" ${it.bg ? 'checked' : ''}><span></span></label></div>
+        ${it.bg ? `<div class="prop sub-prop"><label>Màu nền</label>${colorCtl('bgColor', it.bgColor)}</div>` : ''}
+        <div class="prop row2"><label>Vị trí nhanh</label><div class="seg"><button class="btn" data-pos="0.2">Trên</button><button class="btn" data-pos="0.5">Giữa</button><button class="btn" data-pos="0.72">Dưới</button></div></div>`;
+      } else if (propSub === 'shadow') {
+        h += `<div class="prop row2"><label>Bóng đổ</label><label class="switch"><input type="checkbox" data-check="shadow" ${it.shadow ? 'checked' : ''}><span></span></label></div>
+        ${it.shadow ? `<div class="prop"><label>Màu bóng</label>${colorCtl('shadowColor', it.shadowColor || '#000000')}</div>
+          ${slider('Độ nhòe', 'shadowBlur', 0, 60, 1, it.shadowBlur ?? 12)}${slider('Lệch ngang', 'shadowX', -40, 40, 1, it.shadowX ?? 4)}${slider('Lệch dọc', 'shadowY', -40, 40, 1, it.shadowY ?? 6)}` : '<p class="muted small">Bật bóng đổ để chữ nổi bật trên nền sáng.</p>'}`;
+      } else {
+        h += `${slider('Giãn chữ', 'spacing', -10, 60, 1, it.spacing || 0, 'px')}${slider('Giãn dòng', 'lineH', 0.8, 2.5, 0.02, it.lineH || 1.22)}${slider('Xoay', 'rot', -180, 180, 1, it.rot || 0, '°')}`;
+      }
+    } else {
+      const A = it.anim || {}, cur = (A[animSub] && A[animSub].type) || 'none';
+      h += `<div class="psub"><button class="${animSub === 'in' ? 'on' : ''}" data-asub="in">Vào</button><button class="${animSub === 'out' ? 'on' : ''}" data-asub="out">Ra</button><button class="${animSub === 'loop' ? 'on' : ''}" data-asub="loop">Vòng lặp</button></div>
+        <div class="anim-grid">${ANIMS[animSub].map(([v, l]) => `<button class="anim-c ${cur === v ? 'on' : ''}" data-anim="${v}"><span class="anim-demo an-${animSub}-${v}">${v === 'none' ? '⊘' : 'ABC'}</span><small>${l}</small></button>`).join('')}</div>
+        ${cur !== 'none' ? (animSub === 'loop' ? slider('Tốc độ', 'anim.loop.speed', 0.25, 4, 0.05, (A.loop && A.loop.speed) || 1, '×') : slider('Thời lượng', `anim.${animSub}.dur`, 0.1, 3, 0.05, (A[animSub] && A[animSub].dur) || 0.5, 's')) : ''}`;
+    }
   }
   if (it.kind === 'video' || it.kind === 'image') {
-    h += `<div class="prop"><label>Thu phóng <b>${Math.round((it.scale || 1) * 100)}%</b></label><input type="range" min="0.2" max="3" step="0.01" data-k="scale" data-num value="${it.scale || 1}"></div>
-      <div class="prop"><label>Khung</label><div class="seg">
-        <button class="btn ${it.fit !== 'cover' ? 'on' : ''}" data-fit="contain">Vừa khung</button>
-        <button class="btn ${it.fit === 'cover' ? 'on' : ''}" data-fit="cover">Lấp đầy</button></div></div>
-      <div class="prop"><button class="btn" data-reset>Đặt lại vị trí</button></div>`;
+    h += `<div class="ptabs"><button class="on">${it.kind === 'video' ? 'Video' : 'Ảnh'}</button></div>
+      ${slider('Thu phóng', 'scale', 0.05, 5, 0.01, it.scale || 1, '×')}
+      <div class="prop row2"><label>Khung</label>${segBtns('fit', it.fit || 'contain', [['contain', 'Vừa khung'], ['cover', 'Lấp đầy']])}</div>
+      ${slider('Xoay', 'rot', -180, 180, 1, it.rot || 0, '°')}${slider('Độ mờ', 'opacity', 0, 1, 0.01, it.opacity ?? 1)}
+      <div class="prop"><button class="btn block" data-reset>↺ Đặt lại vị trí, cỡ, góc xoay</button></div>`;
   }
-  if (it.kind === 'video' || it.kind === 'audio') {
-    h += `<div class="prop"><label>Âm lượng <b>${Math.round((it.volume ?? 1) * 100)}%</b></label><input type="range" min="0" max="2" step="0.01" data-k="volume" data-num value="${it.volume ?? 1}"></div>`;
-  }
-  h += `<div class="prop"><button class="btn danger" data-del>Xóa clip</button></div></div>`;
+  if (it.kind === 'video' || it.kind === 'audio') h += `${it.kind === 'audio' ? '<div class="ptabs"><button class="on">Âm thanh</button></div>' : ''}${slider('Âm lượng', 'volume', 0, 2, 0.01, it.volume ?? 1, '×')}`;
+  h += `<div class="ptime muted small">Bắt đầu ${fmt(it.start)} · Dài ${it.dur.toFixed(2)} giây</div><div class="prop"><button class="btn danger block" data-del>🗑 Xóa clip</button></div>`;
   box.innerHTML = h;
   const ta = box.querySelector('textarea'); if (ta) ta.value = it.text;
+  const getK = k => k.split('.').reduce((o, p) => o && o[p], it);
+  const setK = (k, v) => { const ps = k.split('.'); let o = it; for (let i = 0; i < ps.length - 1; i++) o = o[ps[i]] = o[ps[i]] || {}; o[ps[ps.length - 1]] = v; };
   let pre = null;
   box.querySelectorAll('[data-k]').forEach(inp => {
     inp.addEventListener('focus', () => pre = JSON.stringify(P.data));
     inp.addEventListener('pointerdown', () => pre = pre || JSON.stringify(P.data));
     inp.addEventListener('input', () => {
-      it[inp.dataset.k] = inp.dataset.num !== undefined ? +inp.value : inp.value;
-      const lab = inp.previousElementSibling && inp.previousElementSibling.querySelector('b');
-      if (lab && inp.dataset.k === 'size') lab.textContent = inp.value;
-      if (lab && inp.dataset.k === 'scale') lab.textContent = Math.round(inp.value * 100) + '%';
-      if (lab && inp.dataset.k === 'volume') lab.textContent = Math.round(inp.value * 100) + '%';
+      const k = inp.dataset.k; let v = inp.dataset.num !== undefined ? +inp.value : inp.value;
+      if (inp.dataset.num !== undefined && isNaN(v)) return;
+      setK(k, v);
+      box.querySelectorAll(`[data-k="${k}"]`).forEach(o => { if (o !== inp) o.value = v; });
       dirty = true; setSave('Đang lưu…'); clearTimeout(saveT); saveT = setTimeout(flushSave, 1200);
-      if (inp.dataset.k === 'text') renderTimeline();
+      if (k === 'text') renderTimeline();
     });
     inp.addEventListener('change', () => { if (pre) pushHist(pre); pre = null; $('#undoBtn').disabled = !hist.length; });
   });
   const mut = fn => { pushHist(); fn(); box.dataset.for = ''; markDirty(); };
-  box.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => mut(() => it[b.dataset.sw] = b.dataset.c));
+  box.querySelectorAll('[data-ptab]').forEach(b => b.onclick = () => { propTab = b.dataset.ptab; box.dataset.for = ''; renderProps(); });
+  box.querySelectorAll('[data-psub]').forEach(b => b.onclick = () => { propSub = b.dataset.psub; box.dataset.for = ''; renderProps(); });
+  box.querySelectorAll('[data-asub]').forEach(b => b.onclick = () => { animSub = b.dataset.asub; box.dataset.for = ''; renderProps(); });
+  box.querySelectorAll('[data-anim]').forEach(b => b.onclick = () => mut(() => { it.anim = it.anim || {}; const o = it.anim[animSub] = it.anim[animSub] || {}; o.type = b.dataset.anim; if (animSub === 'loop') o.speed = o.speed || 1; else o.dur = o.dur || 0.5; if (b.dataset.anim !== 'none' && animSub !== 'loop') time = animSub === 'in' ? it.start : Math.max(it.start, it.start + it.dur - (o.dur || 0.5) - 0.05); }));
+  box.querySelectorAll('[data-set]').forEach(b => b.onclick = () => mut(() => it[b.dataset.set] = b.dataset.v));
+  box.querySelectorAll('[data-check]').forEach(c => c.onchange = () => mut(() => it[c.dataset.check] = c.checked));
+  const setColor = (key, c) => { c = normHex(c); if (!c) return toast('Mã màu không hợp lệ, ví dụ #C1272C'); addRecent(c); mut(() => it[key] = c); };
+  box.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => setColor(b.dataset.sw, b.dataset.c));
   box.querySelectorAll('input[type=color]').forEach(inp => {
-    inp.onchange = () => mut(() => it[inp.dataset.cc] = inp.value.toUpperCase());
+    let pre2 = null;
+    inp.addEventListener('input', () => { pre2 = pre2 || JSON.stringify(P.data); it[inp.dataset.cc] = inp.value.toUpperCase(); const hx = box.querySelector(`[data-hex="${inp.dataset.cc}"]`); if (hx) hx.value = inp.value.toUpperCase(); });
+    inp.addEventListener('change', () => { if (pre2) pushHist(pre2); pre2 = null; addRecent(inp.value.toUpperCase()); box.dataset.for = ''; markDirty(); });
+  });
+  box.querySelectorAll('[data-hex]').forEach(inp => {
+    const go = () => { if (!inp.isConnected) return; const c = normHex(inp.value); if (c && c === normHex(it[inp.dataset.hex])) return; setColor(inp.dataset.hex, inp.value); };
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+    inp.addEventListener('change', () => setTimeout(go, 0));
   });
   box.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => mut(() => it[b.dataset.toggle] = !it[b.dataset.toggle]));
   box.querySelectorAll('[data-pos]').forEach(b => b.onclick = () => mut(() => { it.y = +b.dataset.pos; it.x = 0.5; }));
-  box.querySelectorAll('[data-fit]').forEach(b => b.onclick = () => mut(() => it.fit = b.dataset.fit));
-  const rs = box.querySelector('[data-reset]'); if (rs) rs.onclick = () => mut(() => { it.x = 0; it.y = 0; it.scale = 1; });
+  const rs = box.querySelector('[data-reset]'); if (rs) rs.onclick = () => mut(() => { it.x = 0; it.y = 0; it.scale = 1; it.rot = 0; it.opacity = 1; });
   box.querySelector('[data-del]').onclick = del;
+  const fb = box.querySelector('[data-fontbtn]');
+  if (fb) { const pop = box.querySelector('[data-fontpop]'); fb.onclick = () => { if (pop.classList.toggle('hidden')) return; openFontPop(pop, it.font || 'Montserrat', f => { pop.classList.add('hidden'); addRecentFont(f); mut(() => it.font = f); }); }; }
 }
-function swatches(key, cur) {
-  return `<div class="swatches">${COLORS.map(c => `<button class="sw ${String(cur).toUpperCase() === c ? 'on' : ''}" style="background:${c}" data-sw="${key}" data-c="${c}" title="${c}"></button>`).join('')}
-    <input type="color" data-cc="${key}" value="${cur || '#ffffff'}" title="Màu khác"></div>`;
+function normHex(c) {
+  c = String(c || '').trim().replace(/^#?/, '#').toUpperCase();
+  if (/^#[0-9A-F]{3}$/.test(c)) c = '#' + c.slice(1).split('').map(x => x + x).join('');
+  return /^#[0-9A-F]{6}$/.test(c) ? c : '';
 }
+function recentColors() { try { return JSON.parse(LS.get('recentColors', '[]')) || []; } catch { return []; } }
+function addRecent(c) { c = normHex(c); if (!c || COLORS.includes(c)) return; LS.set('recentColors', JSON.stringify([c, ...recentColors().filter(x => x !== c)].slice(0, 8))); }
+function colorCtl(key, cur) {
+  cur = normHex(cur) || '#FFFFFF';
+  const sw = c => `<button class="sw ${cur === c ? 'on' : ''}" style="background:${c}" data-sw="${key}" data-c="${c}" title="${c}"></button>`;
+  const rec = recentColors();
+  return `<div class="color-ctl"><div class="swatches">${COLORS.map(sw).join('')}${rec.length ? '<span class="sw-sep"></span>' + rec.map(sw).join('') : ''}</div>
+    <div class="row gap"><input type="color" data-cc="${key}" value="${cur.toLowerCase()}" title="Bảng chọn màu"><input class="hex" data-hex="${key}" value="${cur}" maxlength="7" spellcheck="false" placeholder="#RRGGBB" title="Nhập mã màu rồi bấm Enter"></div></div>`;
+}
+
+/* ================= PHÔNG CHỮ ================= */
+const FONTS = ['Montserrat', 'Be Vietnam Pro', 'Roboto', 'Inter', 'Open Sans', 'Lexend', 'Nunito', 'Quicksand', 'Baloo 2', 'Comfortaa',
+  'Oswald', 'Anton', 'Bangers', 'Playfair Display', 'Merriweather', 'Dancing Script', 'Pacifico', 'Lobster'];
+let userFonts = [];
+async function loadUserFonts() {
+  try {
+    userFonts = await LocalStore.listFonts();
+    for (const f of userFonts) {
+      try { const ff = new FontFace(f.family, await f.blob.arrayBuffer()); await ff.load(); document.fonts.add(ff); } catch (e) { console.warn('font', f.name, e); }
+    }
+  } catch {}
+}
+const favFonts = () => { try { return JSON.parse(LS.get('favFonts', '["Montserrat"]')); } catch { return ['Montserrat']; } };
+const recentFonts = () => { try { return JSON.parse(LS.get('recentFonts', '[]')); } catch { return []; } };
+function addRecentFont(f) { LS.set('recentFonts', JSON.stringify([f, ...recentFonts().filter(x => x !== f)].slice(0, 6))); }
+let sysFonts = null;
+async function loadSystemFonts() {
+  if (sysFonts) return sysFonts;
+  if (!window.queryLocalFonts) throw new Error('Thiết bị này không cho đọc phông trên máy');
+  const list = await window.queryLocalFonts();
+  sysFonts = [...new Set(list.map(f => f.family))].filter(f => !FONTS.includes(f)).sort((a, b) => a.localeCompare(b));
+  return sysFonts;
+}
+function openFontPop(el, cur, pick) {
+  let q = '', tab = 'all';
+  const row = (f, user) => `<button class="font-opt ${f === cur ? 'on' : ''}" data-f="${f.replace(/"/g, '&quot;')}"><span style="font-family:'${f.replace(/'/g, '')}'">${f}</span>
+      <small style="font-family:'${f.replace(/'/g, '')}'">Tiếng Việt có dấu</small><i class="star ${favFonts().includes(f) ? 'on' : ''}" data-star="${f.replace(/"/g, '&quot;')}" title="Yêu thích">★</i>
+      ${user ? `<i class="font-del" data-del="${user}" title="Xóa phông">✕</i>` : ''}</button>`;
+  const sec = (t, arr, user) => arr.length ? `<div class="fsec">${t}</div>` + arr.map(f => row(f.family || f, user && f.id)).join('') : '';
+  const draw = () => {
+    const m = f => !q || (f.family || f).toLowerCase().includes(q);
+    const fav = favFonts().filter(m), rec = recentFonts().filter(m);
+    let body = '';
+    if (tab === 'all') body = sec('⭐ Yêu thích', fav) + sec('🕘 Dùng gần đây', rec) + sec('VIECUT · Việt hóa', FONTS.filter(m)) + sec('Phông bạn đã thêm', userFonts.filter(m), true);
+    else body = sysFonts ? sec('Phông trên máy', sysFonts.filter(m)) || '<p class="muted small pad">Không có phông phù hợp.</p>' : '<p class="muted small pad">Đang đọc phông trên máy…</p>';
+    el.querySelector('.flist').innerHTML = body || '<p class="muted small pad">Không tìm thấy phông.</p>';
+    el.querySelectorAll('.font-opt').forEach(b => b.onclick = e => {
+      const st = e.target.closest('[data-star]'), dl = e.target.closest('[data-del]');
+      if (st) { e.stopPropagation(); const f = st.dataset.star, fv = favFonts(); LS.set('favFonts', JSON.stringify(fv.includes(f) ? fv.filter(x => x !== f) : [f, ...fv])); return draw(); }
+      if (dl) { e.stopPropagation(); return LocalStore.deleteFont(dl.dataset.del).then(loadUserFonts).then(draw); }
+      pick(b.dataset.f);
+    });
+  };
+  el.innerHTML = `<input class="fsearch" placeholder="🔍 Tìm phông chữ"><div class="ftabs"><button class="on" data-ft="all">VIECUT</button><button data-ft="sys">Trên máy</button></div>
+    <div class="flist"></div><label class="font-add">＋ Thêm phông từ file (.ttf, .otf, .woff)<input type="file" accept=".ttf,.otf,.woff,.woff2" hidden></label>`;
+  el.querySelector('.fsearch').oninput = e => { q = e.target.value.trim().toLowerCase(); draw(); };
+  el.querySelectorAll('[data-ft]').forEach(b => b.onclick = async () => {
+    tab = b.dataset.ft; el.querySelectorAll('[data-ft]').forEach(x => x.classList.toggle('on', x === b)); draw();
+    if (tab === 'sys' && !sysFonts) { try { await loadSystemFonts(); } catch (err) { sysFonts = []; toast(err.message); } draw(); }
+  });
+  el.querySelector('.font-add input').onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    const family = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 40) || 'Phông của tôi';
+    try {
+      const ff = new FontFace(family, await file.arrayBuffer()); await ff.load(); document.fonts.add(ff);
+      await LocalStore.addFont(file, family); await loadUserFonts(); toast('Đã thêm phông ' + family); pick(family);
+    } catch { toast('File phông không hợp lệ'); }
+  };
+  draw(); setTimeout(() => el.querySelector('.fsearch').focus(), 30);
+}
+loadUserFonts();
 
 /* ================= XUẤT VIDEO ================= */
 let exporting = false, rec = null, chunks = [], exBlob = null, exExt = 'mp4';
@@ -668,7 +956,7 @@ $('#exDl').onclick = async e => {
 const RES = { '720p': 720, '1080p': 1080, '2K': 1440, '4K': 2160 };
 let nativeBusy = false, nativeOut = '';
 function outSize(resKey) {
-  const [W, H] = ASPECT[P.data.aspect], short = RES[resKey] || 1080, k = short / Math.min(W, H);
+  const [W, H] = dims(), short = RES[resKey] || 1080, k = short / Math.min(W, H);
   return [Math.round(W * k / 2) * 2, Math.round(H * k / 2) * 2];
 }
 function openNativeExport() {
@@ -685,21 +973,43 @@ function updateNexInfo() {
 }
 ['#nexRes', '#nexFps', '#nexQ'].forEach(id => $(id).onchange = updateNexInfo);
 $('#nexClose').onclick = () => { if (!nativeBusy) $('#nexModal').classList.add('hidden'); };
-async function textPngs(outW, outH) {
-  const [W] = ASPECT[P.data.aspect], k = outW / W, res = {}, tmp = [];
-  if (document.fonts) { try { await document.fonts.load('800 60px Montserrat'); await document.fonts.load('600 60px Montserrat'); } catch {} }
-  for (const it of items().filter(i => i.kind === 'text' && String(i.text || '').trim())) {
-    const c = document.createElement('canvas'); c.width = outW; c.height = outH;
-    const g = c.getContext('2d'); g.scale(k, k);
-    drawText(it, ASPECT[P.data.aspect][0], ASPECT[P.data.aspect][1], g);
-    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
-    const f = await window.electronAPI.writeTemp('text-' + it.id + '.png', await blob.arrayBuffer());
-    res[it.id] = f; tmp.push(f);
+async function textSegments(outW, outH, fps, setStep) {
+  const [W, H] = dims(), k = outW / W, segs = {}, tmp = [], dirs = [];
+  const texts = items().filter(i => i.kind === 'text' && String(i.text || '').trim() && !hiddenItem(i));
+  if (document.fonts) {
+    for (const f of [...new Set(texts.map(i => i.font || 'Montserrat'))]) { try { await document.fonts.load(`800 60px "${f}"`, 'Việt'); await document.fonts.load(`500 60px "${f}"`, 'Việt'); } catch {} }
   }
-  return { res, tmp };
+  const off = typeof OffscreenCanvas !== 'undefined';
+  const c = off ? new OffscreenCanvas(outW, outH) : Object.assign(document.createElement('canvas'), { width: outW, height: outH }); const g = c.getContext('2d');
+  const shot = async (it, tl) => {
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, outW, outH); g.scale(k, k); drawText(it, W, H, g, tl);
+    const b = off ? await c.convertToBlob({ type: 'image/png' }) : await new Promise(r => c.toBlob(r, 'image/png'));
+    return b.arrayBuffer();
+  };
+  let n = 0;
+  for (const it of texts) {
+    n++; const d = animDurs(it), list = [];
+    const seq = async (key, t0, frames) => { let dir = ''; for (let i = 0; i < frames; i++) dir = await window.electronAPI.writeFrame(key, i, await shot(it, t0 + i / fps)); dirs.push(dir); return dir; };
+    if (!d.inD && !d.outD && !d.loop) {
+      const f = await window.electronAPI.writeTemp('text-' + it.id + '.png', await shot(it, null)); tmp.push(f);
+      list.push({ start: it.start, dur: it.dur, png: f });
+    } else {
+      setStep(`Đang dựng hiệu ứng chữ ${n}/${texts.length}…`);
+      const inF = Math.round(d.inD * fps), outF = Math.round(d.outD * fps);
+      if (inF) list.push({ start: it.start, dur: inF / fps, seq: await seq(it.id + '-in-' + Date.now(), 0, inF), fps });
+      const midS = it.start + inF / fps, midD = it.dur - inF / fps - outF / fps;
+      if (midD > 0.001) {
+        if (d.loop) { const pf = Math.max(2, Math.round(d.loop * fps)); list.push({ start: midS, dur: midD, seq: await seq(it.id + '-loop-' + Date.now(), inF / fps, pf), fps, loop: true }); }
+        else { const f = await window.electronAPI.writeTemp('text-' + it.id + '-mid.png', await shot(it, inF / fps + 0.0001)); tmp.push(f); list.push({ start: midS, dur: midD, png: f }); }
+      }
+      if (outF) list.push({ start: it.start + it.dur - outF / fps, dur: outF / fps, seq: await seq(it.id + '-out-' + Date.now(), it.dur - outF / fps, outF), fps });
+    }
+    segs[it.id] = list;
+  }
+  return { segs, tmp, dirs };
 }
 async function mediaFiles(setStep) {
-  const used = [...new Set(items().filter(i => i.mediaId).map(i => i.mediaId))];
+  const used = [...new Set(items().filter(i => i.mediaId && !hiddenItem(i)).map(i => i.mediaId))];
   const ms = used.map(mById).filter(Boolean);
   const ok = await window.electronAPI.existing(ms.map(m => m.path || ''));
   const out = {}, tmp = [];
@@ -726,17 +1036,18 @@ $('#nexGo').onclick = async () => {
   $('#nexDone').classList.add('hidden'); $('#nexCancel').classList.remove('hidden');
   const step = t => $('#nexStep').textContent = t; const bar = p => { $('#nexBar').style.width = Math.round(p * 100) + '%'; $('#nexPct').textContent = Math.round(p * 100) + '%'; };
   bar(0); step('Đang chuẩn bị…');
-  const t0 = Date.now(); let tempFiles = [];
+  const t0 = Date.now(); let tempFiles = [], tempDirs = [];
   try {
     await flushSave();
     const mf = await mediaFiles(step); tempFiles.push(...mf.tmp);
-    const tp = await textPngs(outW, outH); tempFiles.push(...tp.tmp);
-    const [W, H] = ASPECT[P.data.aspect];
-    step('Đang dựng video bằng lõi FFmpeg…');
-    window.electronAPI.onExportProgress(p => { bar(p); const el = (Date.now() - t0) / 1000; if (p > 0.02) step(`Đang dựng video… còn khoảng ${Math.max(1, Math.round(el / p - el))} giây`); });
+    const tp = await textSegments(outW, outH, fps, step); tempFiles.push(...tp.tmp); tempDirs.push(...tp.dirs);
+    const [W, H] = dims();
+    step('Đang dựng video bằng lõi FFmpeg…'); const tf = Date.now();
+    window.electronAPI.onExportProgress(p => { bar(p); const el = (Date.now() - tf) / 1000; if (p > 0.02) step(`Đang dựng video… còn khoảng ${Math.max(1, Math.round(el / p - el))} giây`); });
     await window.electronAPI.exportStart({
       W, H, outW, outH, fps, crf: Q[0], preset: Q[1], duration: projDur(), out,
-      items: JSON.parse(JSON.stringify(items())), media: mf.out, textPng: tp.res, tempFiles,
+      items: JSON.parse(JSON.stringify(items().filter(i => !hiddenItem(i)).map(i => mutedItem(i) ? { ...i, volume: 0 } : i))),
+      media: mf.out, textSegs: tp.segs, tempFiles, tempDirs,
     });
     bar(1); step(`Xong sau ${((Date.now() - t0) / 1000).toFixed(1)} giây · ${out}`);
     $('#nexDone').classList.remove('hidden'); $('#nexCancel').classList.add('hidden');

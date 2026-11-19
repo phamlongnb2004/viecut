@@ -7,6 +7,7 @@
 <title>VIECUT</title>
 <link rel="icon" href="img/favicon.png">
 <link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="fonts/fonts-extra.css">
 <link rel="stylesheet" href="style.css">
 <script>try{if(localStorage.getItem("theme")==="dark")document.documentElement.dataset.theme="dark"}catch(e){}</script>
 </head>
@@ -62,75 +63,101 @@
   </form>
 </div>
 
-<!-- EDITOR -->
+<!-- EDITOR (bố cục kiểu phần mềm dựng phim) -->
 <div id="editor" class="screen hidden">
-  <header class="topbar">
-    <button class="btn icon" id="backBtn" title="Về trang chủ">←</button>
+  <header class="ed-top">
+    <button class="btn icon ghost" id="backBtn" title="Về trang chủ">←</button>
+    <img src="img/icon-256.png" alt="" class="ed-ic">
+    <span id="saveState" class="save-state"></span>
     <span id="storeBadge" class="store-badge"></span>
-    <input id="projName" class="name-input">
-    <select id="aspectSel" class="sel">
-      <option value="9:16">9:16</option><option value="16:9">16:9</option>
-      <option value="1:1">1:1</option><option value="4:5">4:5</option>
-    </select>
-    <button class="btn icon" id="undoBtn" title="Hoàn tác (Ctrl+Z)">↶</button>
-    <button class="btn icon" id="redoBtn" title="Làm lại (Ctrl+Y)">↷</button>
-    <span id="saveState" class="muted small"></span>
     <div class="grow"></div>
-    <button type="button" class="btn icon theme-btn" title="Đổi giao diện sáng / tối">🌙</button>
-    <button class="btn primary" id="exportBtn">Xuất video</button>
+    <input id="projName" class="name-input" title="Đổi tên dự án">
+    <div class="grow"></div>
+    <select id="aspectSel" class="sel" title="Tỷ lệ khung hình">
+      <option value="orig">Bản gốc</option>
+      <optgroup label="Ngang"><option value="16:9">16:9 · YouTube</option><option value="4:3">4:3</option><option value="2.35:1">2.35:1 · Điện ảnh</option><option value="2:1">2:1</option><option value="1.85:1">1.85:1</option></optgroup>
+      <optgroup label="Dọc"><option value="9:16">9:16 · TikTok, Reels</option><option value="3:4">3:4</option><option value="5.8-inch">5.8-inch · Điện thoại</option><option value="4:5">4:5 · Facebook, Instagram</option></optgroup>
+      <optgroup label="Vuông"><option value="1:1">1:1</option></optgroup>
+    </select>
+    <button type="button" class="btn icon ghost theme-btn" title="Đổi giao diện sáng / tối">🌙</button>
+    <button class="btn primary" id="exportBtn">⇪ Xuất</button>
   </header>
 
-  <div class="main">
-    <aside class="panel left">
-      <div class="tabs">
-        <button class="tab active" data-tab="media">Media</button>
-        <button class="tab" data-tab="text">Chữ</button>
-      </div>
-      <div class="tab-body" id="tab-media">
-        <label class="btn primary block upload">
-          + Nhập file (video, ảnh, nhạc)
-          <input type="file" id="fileIn" multiple accept="video/*,audio/*,image/*" hidden>
-        </label>
-        <div id="upProg" class="muted small"></div>
-        <div id="mediaGrid" class="media-grid"></div>
-      </div>
-      <div class="tab-body hidden" id="tab-text">
-        <button class="btn primary block" id="addText">+ Thêm chữ</button>
-        <p class="muted small">Chữ được thêm tại vị trí con trỏ thời gian. Kéo chữ trực tiếp trên khung hình để đổi vị trí.</p>
-        <div class="preset-list">
-          <button class="preset" data-preset="title">Tiêu đề</button>
-          <button class="preset" data-preset="sub">Phụ đề</button>
-          <button class="preset" data-preset="red">Nhấn mạnh đỏ</button>
-          <button class="preset" data-preset="box">Chữ nền xanh</button>
+  <div class="ed-main">
+    <!-- Bảng tài nguyên -->
+    <section class="ed-panel ed-assets">
+      <nav class="cat">
+        <button class="cat-i on" data-tab="media"><span>🎞️</span>Phương tiện</button>
+        <button class="cat-i" data-tab="audio"><span>🎵</span>Âm thanh</button>
+        <button class="cat-i" data-tab="text"><span>T</span>Văn bản</button>
+        <button class="cat-i" data-tab="sticker"><span>⭐</span>Nhãn dán</button>
+        <button class="cat-i" data-tab="fx"><span>✨</span>Hiệu ứng</button>
+        <button class="cat-i" data-tab="trans"><span>🔀</span>Chuyển cảnh</button>
+        <button class="cat-i" data-tab="filter"><span>🎨</span>Bộ lọc</button>
+      </nav>
+      <div class="assets-body">
+        <aside class="sub" id="subNav"></aside>
+        <div class="assets-main">
+          <div class="tab-body" id="tab-media">
+            <div class="row gap">
+              <label class="btn primary sm upload">＋ Nhập<input type="file" id="fileIn" multiple accept="video/*,audio/*,image/*" hidden></label>
+              <input id="mediaSearch" class="sm-input grow" placeholder="🔍 Tìm tệp">
+            </div>
+            <div id="upProg" class="muted small"></div>
+            <div id="mediaGrid" class="media-grid"></div>
+          </div>
+          <div class="tab-body hidden" id="tab-text">
+            <button class="btn primary block" id="addText">＋ Thêm chữ mặc định</button>
+            <p class="muted small">Chữ được thêm tại con trỏ thời gian. Kéo chữ trên khung hình để đổi vị trí.</p>
+            <div class="preset-list">
+              <button class="preset" data-preset="title">Tiêu đề</button>
+              <button class="preset" data-preset="sub">Phụ đề</button>
+              <button class="preset" data-preset="red">Nhấn mạnh đỏ</button>
+              <button class="preset" data-preset="box">Chữ nền xanh</button>
+            </div>
+          </div>
+          <div class="tab-body hidden" id="tab-soon"><div class="empty"><div class="empty-ic">🚧</div><b>Sắp có</b><p>Tính năng này đang được làm.</p></div></div>
         </div>
-      </div>
-    </aside>
-
-    <section class="preview">
-      <div class="stage" id="stage"><canvas id="cv"></canvas></div>
-      <div class="controls">
-        <span id="tcur" class="mono">00:00.0</span>
-        <button class="btn icon" id="stepBack" title="Lùi 1 khung">⏮</button>
-        <button class="btn icon play" id="playBtn" title="Phát / dừng (Space)">▶</button>
-        <button class="btn icon" id="stepFwd" title="Tiến 1 khung">⏭</button>
-        <span id="tdur" class="mono muted">00:00.0</span>
-        <label class="chk small"><input type="checkbox" id="safeChk" checked> Vùng an toàn</label>
       </div>
     </section>
 
-    <aside class="panel right" id="props"></aside>
+    <!-- Bảng chi tiết -->
+    <section class="ed-panel ed-detail">
+      <div class="ph">Chi tiết</div>
+      <div id="props" class="props-wrap"></div>
+    </section>
+
+    <!-- Trình phát -->
+    <section class="ed-panel ed-player">
+      <div class="ph">Trình phát</div>
+      <div class="stage" id="stage"><canvas id="cv"></canvas></div>
+      <div class="controls">
+        <span class="mono"><b id="tcur">00:00.0</b> / <span id="tdur" class="muted">00:00.0</span></span>
+        <div class="grow"></div>
+        <button class="btn icon ghost" id="stepBack" title="Lùi 1 khung">⏮</button>
+        <button class="btn icon play" id="playBtn" title="Phát / dừng (Space)">▶</button>
+        <button class="btn icon ghost" id="stepFwd" title="Tiến 1 khung">⏭</button>
+        <div class="grow"></div>
+        <label class="chk small" title="Hiện vùng an toàn TikTok"><input type="checkbox" id="safeChk" checked> An toàn</label>
+      </div>
+    </section>
   </div>
 
-  <div class="toolbar">
-    <button class="btn" id="splitBtn" title="Tách tại con trỏ (S)">✂ Tách</button>
-    <button class="btn" id="dupBtn" title="Nhân đôi">⧉ Nhân đôi</button>
-    <button class="btn danger" id="delBtn" title="Xóa (Delete)">🗑 Xóa</button>
+  <!-- Thanh công cụ timeline -->
+  <div class="tl-tools">
+    <button class="btn icon ghost" id="undoBtn" title="Hoàn tác (Ctrl+Z)">↶</button>
+    <button class="btn icon ghost" id="redoBtn" title="Làm lại (Ctrl+Y)">↷</button>
+    <span class="sep"></span>
+    <button class="btn icon ghost" id="splitBtn" title="Tách tại con trỏ (S)">✂</button>
+    <button class="btn icon ghost" id="dupBtn" title="Nhân đôi">⧉</button>
+    <button class="btn icon ghost" id="delBtn" title="Xóa (Delete)">🗑</button>
     <div class="grow"></div>
-    <span class="muted small">Thu phóng</span>
+    <button class="btn icon ghost" id="zoomOut" title="Thu nhỏ timeline">－</button>
     <input type="range" id="zoom" min="10" max="300" value="60">
+    <button class="btn icon ghost" id="zoomIn" title="Phóng to timeline">＋</button>
   </div>
 
-  <div class="timeline">
+  <div class="timeline" id="timeline">
     <div class="labels" id="tlLabels"></div>
     <div class="tl-scroll" id="tlScroll">
       <div class="tl-content" id="tlContent">
@@ -138,8 +165,10 @@
         <div id="tracks"></div>
         <div class="playhead" id="playhead"></div>
       </div>
+      <div class="tl-empty" id="tlEmpty">🎞️ Kéo file vào đây hoặc bấm ＋ Nhập để bắt đầu dựng video</div>
     </div>
   </div>
+  <div class="drop-veil hidden" id="dropVeil">Thả file vào để nhập</div>
 </div>
 
 <!-- XUẤT VIDEO -->

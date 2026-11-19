@@ -53,16 +53,24 @@ function buildArgs(job) {
 
   // ---- hình: video, ảnh (theo thứ tự bắt đầu), rồi chữ nằm trên cùng ----
   const vis = job.items.filter(i => i.kind === 'video' || i.kind === 'image').sort((a, b) => a.start - b.start);
-  const texts = job.items.filter(i => i.kind === 'text' && job.textPng[i.id]).sort((a, b) => a.start - b.start);
+  const textSegs = job.textSegs || {};
+  for (const id of Object.keys(job.textPng || {})) if (!textSegs[id]) { const it = job.items.find(i => i.id === id); if (it) textSegs[id] = [{ start: it.start, dur: it.dur, png: job.textPng[id] }]; }
+  const texts = job.items.filter(i => i.kind === 'text' && textSegs[i.id]).sort((a, b) => a.start - b.start);
   for (const it of [...vis, ...texts]) {
     const start = it.start, end = it.start + it.dur;
-    let idx, chain;
+    let idx;
     if (it.kind === 'text') {
-      idx = addInput(['-loop', '1', '-framerate', String(fps), '-t', num(it.dur), '-i', job.textPng[it.id]]);
-      chain = `[${idx}:v]format=rgba,setpts=PTS-STARTPTS+${num(start)}/TB[v${idx}]`;
-      filters.push(chain);
-      filters.push(`[${base}][v${idx}]overlay=0:0:eof_action=pass:enable='between(t,${num(start)},${num(end)})'[b${++step}]`);
-      base = `b${step}`; continue;
+      for (const sg of textSegs[it.id]) {
+        if (sg.dur <= 0) continue;
+        const sf = sg.fps || fps;
+        if (sg.png) idx = addInput(['-loop', '1', '-framerate', String(fps), '-t', num(sg.dur), '-i', sg.png]);
+        else if (sg.loop) idx = addInput(['-stream_loop', '-1', '-framerate', String(sf), '-t', num(sg.dur), '-i', path.join(sg.seq, 'f%05d.png')]);
+        else idx = addInput(['-framerate', String(sf), '-start_number', '0', '-i', path.join(sg.seq, 'f%05d.png')]);
+        filters.push(`[${idx}:v]format=rgba,fps=${fps},setpts=PTS-STARTPTS+${num(sg.start)}/TB[v${idx}]`);
+        filters.push(`[${base}][v${idx}]overlay=0:0:eof_action=pass:enable='between(t,${num(sg.start)},${num(sg.start + sg.dur - 0.0001)})'[b${++step}]`);
+        base = `b${step}`;
+      }
+      continue;
     }
     const m = job.media[it.mediaId]; if (!m || !m.path) continue;
     if (it.kind === 'video') idx = addInput(['-ss', num(it.in || 0), '-t', num(it.dur), '-i', m.path]);
@@ -70,8 +78,13 @@ function buildArgs(job) {
     const sw = m.width || W, sh = m.height || H;
     const s = (it.fit === 'cover' ? Math.max(W / sw, H / sh) : Math.min(W / sw, H / sh)) * (it.scale || 1);
     const w = even(sw * s * k), h = even(sh * s * k);
-    const x = Math.round((outW - w) / 2 + (it.x || 0) * outW), y = Math.round((outH - h) / 2 + (it.y || 0) * outH);
-    filters.push(`[${idx}:v]fps=${fps},scale=${w}:${h}:flags=lanczos,setsar=1,format=rgba,setpts=PTS-STARTPTS+${num(start)}/TB[v${idx}]`);
+    const a = (it.rot || 0) * Math.PI / 180, ca = Math.abs(Math.cos(a)), sa = Math.abs(Math.sin(a));
+    const rw = a ? even(w * ca + h * sa) : w, rh = a ? even(w * sa + h * ca) : h;
+    const cx = outW / 2 + (it.x || 0) * outW, cy = outH / 2 + (it.y || 0) * outH;
+    const x = Math.round(cx - rw / 2), y = Math.round(cy - rh / 2);
+    const rotF = a ? `,rotate=${num(a)}:ow=${rw}:oh=${rh}:c=none` : '';
+    const opF = (it.opacity ?? 1) < 1 ? `,colorchannelmixer=aa=${num(it.opacity)}` : '';
+    filters.push(`[${idx}:v]fps=${fps},scale=${w}:${h}:flags=lanczos,setsar=1,format=rgba${rotF}${opF},setpts=PTS-STARTPTS+${num(start)}/TB[v${idx}]`);
     filters.push(`[${base}][v${idx}]overlay=${x}:${y}:eof_action=pass:enable='between(t,${num(start)},${num(end)})'[b${++step}]`);
     base = `b${step}`;
     if (it.kind === 'video' && m.hasAudio && (it.volume ?? 1) > 0) audio.push({ idx, it });

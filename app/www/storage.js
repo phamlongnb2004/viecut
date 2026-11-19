@@ -9,11 +9,12 @@ const LocalStore = (() => {
   const urls = new Map(); // mediaId -> blob URL
   function db() {
     if (!dbp) dbp = new Promise((res, rej) => {
-      const r = indexedDB.open('viecut', 1);
+      const r = indexedDB.open('viecut', 2);
       r.onupgradeneeded = () => {
         const d = r.result;
         if (!d.objectStoreNames.contains('projects')) d.createObjectStore('projects', { keyPath: 'id' });
         if (!d.objectStoreNames.contains('media')) d.createObjectStore('media', { keyPath: 'id' });
+        if (!d.objectStoreNames.contains('fonts')) d.createObjectStore('fonts', { keyPath: 'id' });
       };
       r.onsuccess = () => res(r.result);
       r.onerror = () => rej(r.error || new Error('Không mở được bộ nhớ trên máy'));
@@ -69,6 +70,13 @@ const LocalStore = (() => {
       if (urls.has(id)) { URL.revokeObjectURL(urls.get(id)); urls.delete(id); }
     },
     mediaUrl: m => urls.get(m.id) || '',
+    // font người dùng tự thêm (.ttf/.otf/.woff) – lưu trên máy, dùng cho mọi dự án
+    listFonts: () => tx('fonts', 'readonly', s => s.getAll()).then(a => a || []),
+    async addFont(file, family) {
+      const f = { id: uid(), family, name: file.name, blob: file, created: Date.now() };
+      await tx('fonts', 'readwrite', s => s.put(f)); return f;
+    },
+    deleteFont: id => tx('fonts', 'readwrite', s => s.delete(id)),
   };
 })();
 

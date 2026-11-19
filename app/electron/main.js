@@ -1,6 +1,6 @@
 // VIECUT cho Windows / Linux (Electron)
 // Tác giả: Phạm Thành Long (thlong)
-const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -111,6 +111,10 @@ ipcMain.handle('write-temp', async (e, name, buffer) => {
   const f = path.join(TMP(), Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + '-' + safe);
   await fs.promises.writeFile(f, Buffer.from(buffer)); return f;
 });
+ipcMain.handle('write-frame', async (e, key, i, buffer) => {
+  const d = path.join(TMP(), String(key).replace(/[^\w\-]+/g, '_')); await fs.promises.mkdir(d, { recursive: true });
+  await fs.promises.writeFile(path.join(d, 'f' + String(i).padStart(5, '0') + '.png'), Buffer.from(buffer)); return d;
+});
 ipcMain.handle('existing', (e, paths) => (paths || []).map(p => { try { return !!p && fs.statSync(p).isFile(); } catch { return false; } }));
 ipcMain.handle('choose-save', async (event, name) => {
   const w = BrowserWindow.fromWebContents(event.sender);
@@ -131,6 +135,7 @@ ipcMain.handle('export-start', async (event, job) => {
   finally {
     current = null;
     for (const f of job.tempFiles || []) fs.promises.unlink(f).catch(() => {});
+    for (const d of job.tempDirs || []) fs.promises.rm(d, { recursive: true, force: true }).catch(() => {});
   }
 });
 ipcMain.handle('export-cancel', () => { if (current) current.cancel(); });
@@ -142,6 +147,10 @@ if (!app.requestSingleInstanceLock()) { app.quit(); }
 else {
   app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
   app.whenReady().then(() => {
+    // cho phép đọc danh sách phông đã cài trên máy (bộ chọn phông > Trên máy)
+    const ok = p => ['local-fonts', 'clipboard-sanitized-write', 'fullscreen'].includes(p);
+    session.defaultSession.setPermissionRequestHandler((wc, perm, cb) => cb(ok(perm)));
+    session.defaultSession.setPermissionCheckHandler((wc, perm) => ok(perm));
     log('Khởi động VIECUT', app.getVersion(), process.platform, process.arch, gpuOff ? '(không dùng GPU)' : '', compat ? '(chế độ tương thích)' : '');
     createWindow();
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

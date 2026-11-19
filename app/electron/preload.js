@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveFile: (name, buffer) => ipcRenderer.invoke('save-file', name, buffer),
   pathOf: file => { try { return webUtils.getPathForFile(file) || ''; } catch { return ''; } },
   writeTemp: (name, buffer) => ipcRenderer.invoke('write-temp', name, buffer),
+  writeFrame: (key, i, buffer) => ipcRenderer.invoke('write-frame', key, i, buffer),
   existing: paths => ipcRenderer.invoke('existing', paths),
   chooseSave: name => ipcRenderer.invoke('choose-save', name),
   exportStart: job => ipcRenderer.invoke('export-start', job),
