@@ -1,0 +1,10 @@
+node_modules/
+app/dist/
+server/data/
+app/android/app/build/
+app/android/.gradle/
+app/ios/App/Pods/
+/build/
+cloudflare/site/files/
+cloudflare/site/manifest.json
+.wrangler/

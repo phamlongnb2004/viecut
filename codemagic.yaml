@@ -1,0 +1,34 @@
+# Codemagic (máy Mac miễn phí ~500 phút/tháng): dựng VIECUT iOS .ipa CHƯA KÝ để cài thử bằng Sideloadly / AltStore.
+# Codemagic → Add application → chọn kho GitHub viecut → Start new build → workflow "iOS IPA chưa ký".
+# Muốn gắn sẵn địa chỉ server: thêm biến môi trường SERVER_URL trong Codemagic.
+workflows:
+  ios-unsigned:
+    name: iOS IPA chưa ký
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: latest
+      node: 20
+      cocoapods: default
+    scripts:
+      - name: Cài thư viện + gắn địa chỉ server
+        script: |
+          set -e
+          cd app
+          npm ci
+          printf "window.VIECUT_SERVER = '%s';\n" "${SERVER_URL:-}" > www/config.js
+          npx cap sync ios
+      - name: Dựng .app không ký và đóng gói .ipa
+        script: |
+          set -e
+          cd app/ios/App
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' -derivedDataPath dd \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" build > xb.log 2>&1 || { tail -80 xb.log; exit 1; }
+          APP=$(find dd/Build/Products -maxdepth 2 -name '*.app' | head -1)
+          rm -rf Payload && mkdir Payload && cp -R "$APP" Payload/
+          zip -qry "$CM_BUILD_DIR/VIECUT.ipa" Payload
+          ls -la "$CM_BUILD_DIR/VIECUT.ipa"
+    artifacts:
+      - VIECUT.ipa
+      - app/ios/App/xb.log

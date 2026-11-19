@@ -1,0 +1,13 @@
+// Cloudflare Workers cho VIECUT: trang tải app (gói miễn phí).
+// Deploy: tools/pack-cloudflare.js (cắt file cài trong build/) rồi `npx wrangler deploy`.
+{
+  "name": "viecut",
+  "main": "cloudflare/worker.js",
+  "compatibility_date": "2025-06-01",
+  "assets": {
+    "directory": "./cloudflare/site",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "observability": { "enabled": true }
+}

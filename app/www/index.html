@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<!-- Tác giả: Phạm Thành Long (thlong) -->
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VIECUT</title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ĐĂNG NHẬP -->
+<div id="auth" class="screen center">
+  <form class="card auth-card" id="authForm">
+    <div class="logo big">VIE<b>CUT</b></div>
+    <p class="muted">Đăng nhập để edit trên mọi máy</p>
+    <input id="asrv" placeholder="Địa chỉ server, vd http://192.168.1.10:3000" required>
+    <input id="au" placeholder="Tên đăng nhập" autocomplete="username" required>
+    <input id="ap" type="password" placeholder="Mật khẩu" autocomplete="current-password" required>
+    <input id="ap2" type="password" placeholder="Nhập lại mật khẩu" autocomplete="new-password" class="hidden">
+    <div class="row gap">
+      <button type="submit" class="btn primary grow" data-act="login">Đăng nhập</button>
+      <button type="submit" class="btn grow" data-act="register">Đăng ký</button>
+    </div>
+    <div id="amsg" class="msg"></div>
+  </form>
+</div>
+
+<!-- DANH SÁCH DỰ ÁN -->
+<div id="projects" class="screen hidden">
+  <header class="topbar">
+    <div class="logo">VIE<b>CUT</b></div>
+    <div class="grow"></div>
+    <span class="muted" id="meName"></span>
+    <button class="btn" id="logoutBtn">Đăng xuất</button>
+  </header>
+  <div class="proj-wrap">
+    <div class="row gap wrap">
+      <h2 class="grow">Dự án của bạn</h2>
+      <select id="newAspect" class="sel">
+        <option value="9:16">9:16 (TikTok/Reels)</option>
+        <option value="16:9">16:9 (YouTube)</option>
+        <option value="1:1">1:1</option>
+        <option value="4:5">4:5</option>
+      </select>
+      <button class="btn primary" id="newProj">+ Dự án mới</button>
+    </div>
+    <div id="projList" class="proj-grid"></div>
+  </div>
+</div>
+
+<!-- EDITOR -->
+<div id="editor" class="screen hidden">
+  <header class="topbar">
+    <button class="btn icon" id="backBtn" title="Về danh sách">←</button>
+    <input id="projName" class="name-input">
+    <select id="aspectSel" class="sel">
+      <option value="9:16">9:16</option><option value="16:9">16:9</option>
+      <option value="1:1">1:1</option><option value="4:5">4:5</option>
+    </select>
+    <button class="btn icon" id="undoBtn" title="Hoàn tác (Ctrl+Z)">↶</button>
+    <button class="btn icon" id="redoBtn" title="Làm lại (Ctrl+Y)">↷</button>
+    <span id="saveState" class="muted small"></span>
+    <div class="grow"></div>
+    <button class="btn primary" id="exportBtn">Xuất video</button>
+  </header>
+
+  <div class="main">
+    <aside class="panel left">
+      <div class="tabs">
+        <button class="tab active" data-tab="media">Media</button>
+        <button class="tab" data-tab="text">Chữ</button>
+      </div>
+      <div class="tab-body" id="tab-media">
+        <label class="btn primary block upload">
+          + Nhập file (video, ảnh, nhạc)
+          <input type="file" id="fileIn" multiple accept="video/*,audio/*,image/*" hidden>
+        </label>
+        <div id="upProg" class="muted small"></div>
+        <div id="mediaGrid" class="media-grid"></div>
+      </div>
+      <div class="tab-body hidden" id="tab-text">
+        <button class="btn primary block" id="addText">+ Thêm chữ</button>
+        <p class="muted small">Chữ được thêm tại vị trí con trỏ thời gian. Kéo chữ trực tiếp trên khung hình để đổi vị trí.</p>
+        <div class="preset-list">
+          <button class="preset" data-preset="title">Tiêu đề</button>
+          <button class="preset" data-preset="sub">Phụ đề</button>
+          <button class="preset" data-preset="red">Nhấn mạnh đỏ</button>
+          <button class="preset" data-preset="box">Chữ nền xanh</button>
+        </div>
+      </div>
+    </aside>
+
+    <section class="preview">
+      <div class="stage" id="stage"><canvas id="cv"></canvas></div>
+      <div class="controls">
+        <span id="tcur" class="mono">00:00.0</span>
+        <button class="btn icon" id="stepBack" title="Lùi 1 khung">⏮</button>
+        <button class="btn icon play" id="playBtn" title="Phát / dừng (Space)">▶</button>
+        <button class="btn icon" id="stepFwd" title="Tiến 1 khung">⏭</button>
+        <span id="tdur" class="mono muted">00:00.0</span>
+        <label class="chk small"><input type="checkbox" id="safeChk" checked> Vùng an toàn</label>
+      </div>
+    </section>
+
+    <aside class="panel right" id="props"></aside>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn" id="splitBtn" title="Tách tại con trỏ (S)">✂ Tách</button>
+    <button class="btn" id="dupBtn" title="Nhân đôi">⧉ Nhân đôi</button>
+    <button class="btn danger" id="delBtn" title="Xóa (Delete)">🗑 Xóa</button>
+    <div class="grow"></div>
+    <span class="muted small">Thu phóng</span>
+    <input type="range" id="zoom" min="10" max="300" value="60">
+  </div>
+
+  <div class="timeline">
+    <div class="labels" id="tlLabels"></div>
+    <div class="tl-scroll" id="tlScroll">
+      <div class="tl-content" id="tlContent">
+        <div class="ruler" id="ruler"></div>
+        <div id="tracks"></div>
+        <div class="playhead" id="playhead"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- XUẤT VIDEO -->
+<div id="exportModal" class="modal hidden">
+  <div class="card">
+    <h3 id="exTitle">Đang xuất video…</h3>
+    <p class="muted small" id="exNote">Giữ tab này mở trong lúc xuất. Video được dựng theo thời gian thực.</p>
+    <div class="bar"><div id="exBar"></div></div>
+    <div class="row gap end">
+      <button class="btn" id="exCancel">Hủy</button>
+      <a class="btn primary hidden" id="exDl">Tải video</a>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<div id="mediaPool" aria-hidden="true"></div>
+<script src="config.js"></script>
+<script src="native.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

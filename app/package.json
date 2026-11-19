@@ -1,0 +1,63 @@
+{
+  "name": "viecut",
+  "productName": "VIECUT",
+  "version": "0.1.0",
+  "description": "VIECUT - app edit video kiểu CapCut (Windows, Android, iOS)",
+  "author": "Phạm Thành Long (thlong)",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win --x64",
+    "ios": "cap sync ios && cap open ios"
+  },
+  "build": {
+    "appId": "com.viecut.app",
+    "productName": "VIECUT",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**",
+      "www/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "VIECUT"
+    },
+    "portable": {
+      "artifactName": "VIECUT-portable-${version}.exe"
+    },
+    "copyright": "© 2026 Phạm Thành Long (thlong)"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/filesystem": "^6.0.2",
+    "@capacitor/ios": "^6.2.0",
+    "@capacitor/share": "^6.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  }
+}

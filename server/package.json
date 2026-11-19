@@ -1,0 +1,16 @@
+{
+  "name": "viecut",
+  "version": "0.1.0",
+  "description": "App edit video kiểu CapCut chạy trên trình duyệt, có đăng nhập, dùng được trên nhiều máy",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1"
+  },
+  "author": "Phạm Thành Long (thlong)"
+}
