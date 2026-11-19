@@ -41,10 +41,11 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        getWindow().setStatusBarColor(Color.rgb(23, 24, 29));
-        getWindow().setNavigationBarColor(Color.rgb(23, 24, 29));
+        getWindow().setStatusBarColor(Color.rgb(255, 255, 255));
+        getWindow().setNavigationBarColor(Color.rgb(255, 255, 255));
+        getWindow().getDecorView().setSystemUiVisibility(android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         web = new WebView(this);
-        web.setBackgroundColor(Color.rgb(15, 16, 20));
+        web.setBackgroundColor(Color.rgb(244, 247, 239));
         setContentView(web);
 
         WebSettings s = web.getSettings();

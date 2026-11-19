@@ -5,15 +5,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>VIECUT</title>
+<link rel="icon" href="img/favicon.png">
 <link rel="stylesheet" href="fonts/fonts.css">
 <link rel="stylesheet" href="style.css">
+<script>try{if(localStorage.getItem("theme")==="dark")document.documentElement.dataset.theme="dark"}catch(e){}</script>
 </head>
 <body>
 
 <!-- ĐĂNG NHẬP -->
 <div id="auth" class="screen center">
   <form class="card auth-card" id="authForm">
-    <div class="logo big">VIE<b>CUT</b></div>
+    <button type="button" class="btn icon theme-btn" title="Đổi giao diện sáng / tối">🌙</button>
+    <img src="img/icon-256.png" alt="" class="auth-icon">
+    <img src="img/logo.png" alt="VIECUT" class="logo-img big">
     <p class="muted">Đăng nhập để edit trên mọi máy</p>
     <input id="asrv" placeholder="Địa chỉ server, vd http://192.168.1.10:3000" required>
     <input id="au" placeholder="Tên đăng nhập" autocomplete="username" required>
@@ -30,9 +34,10 @@
 <!-- DANH SÁCH DỰ ÁN -->
 <div id="projects" class="screen hidden">
   <header class="topbar">
-    <div class="logo">VIE<b>CUT</b></div>
+    <img src="img/logo.png" alt="VIECUT" class="logo-img">
     <div class="grow"></div>
     <span class="muted" id="meName"></span>
+    <button type="button" class="btn icon theme-btn" title="Đổi giao diện sáng / tối">🌙</button>
     <button class="btn" id="logoutBtn">Đăng xuất</button>
   </header>
   <div class="proj-wrap">
@@ -63,6 +68,7 @@
     <button class="btn icon" id="redoBtn" title="Làm lại (Ctrl+Y)">↷</button>
     <span id="saveState" class="muted small"></span>
     <div class="grow"></div>
+    <button type="button" class="btn icon theme-btn" title="Đổi giao diện sáng / tối">🌙</button>
     <button class="btn primary" id="exportBtn">Xuất video</button>
   </header>
 

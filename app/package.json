@@ -1,7 +1,7 @@
 {
   "name": "viecut",
   "productName": "VIECUT",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "VIECUT - app edit video kiểu CapCut (Windows, Android, iOS)",
   "author": "Phạm Thành Long (thlong)",
   "main": "electron/main.js",
@@ -19,7 +19,8 @@
     "files": [
       "electron/**",
       "www/**",
-      "package.json"
+      "package.json",
+      "build/icon.png"
     ],
     "win": {
       "target": [

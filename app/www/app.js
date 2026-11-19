@@ -34,11 +34,23 @@ const fmt = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m *
 const uid = () => Math.random().toString(36).slice(2, 10);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
+/* ================= GIAO DIỆN SÁNG / TỐI ================= */
+function applyTheme(t) {
+  if (t === 'dark') document.documentElement.dataset.theme = 'dark'; else delete document.documentElement.dataset.theme;
+  $$('.theme-btn').forEach(b => b.textContent = t === 'dark' ? '☀' : '🌙');
+}
+applyTheme(LS.get('theme', 'light'));
+$$('.theme-btn').forEach(b => b.addEventListener('click', e => {
+  e.preventDefault();
+  const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  LS.set('theme', t); applyTheme(t);
+}));
+
 /* ================= ĐĂNG NHẬP ================= */
 $('#asrv').value = SERVER;
 if (FIXED_SERVER) { $('#asrv').classList.add('hidden'); $('#asrv').required = false; }
 let authAct = 'login';
-$$('#authForm button').forEach(b => b.addEventListener('click', () => authAct = b.dataset.act));
+$$('#authForm button[data-act]').forEach(b => b.addEventListener('click', () => authAct = b.dataset.act));
 $('#authForm').addEventListener('submit', async e => {
   e.preventDefault();
   $('#amsg').textContent = '';
