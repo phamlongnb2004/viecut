@@ -119,8 +119,8 @@ ipcMain.handle('existing', (e, paths) => (paths || []).map(p => { try { return !
 ipcMain.handle('choose-save', async (event, name) => {
   const w = BrowserWindow.fromWebContents(event.sender);
   const { canceled, filePath } = await dialog.showSaveDialog(w, {
-    title: 'Xuất video', defaultPath: path.join(app.getPath('videos'), name || 'video.mp4'),
-    filters: [{ name: 'Video MP4', extensions: ['mp4'] }],
+    title: /\.mp3$/i.test(name || '') ? 'Xuất âm thanh' : 'Xuất video', defaultPath: path.join(app.getPath(/\.mp3$/i.test(name || '') ? 'music' : 'videos'), name || 'video.mp4'),
+    filters: /\.mp3$/i.test(name || '') ? [{ name: 'Âm thanh MP3', extensions: ['mp3'] }] : [{ name: 'Video MP4', extensions: ['mp4'] }],
   });
   return canceled ? null : filePath;
 });
